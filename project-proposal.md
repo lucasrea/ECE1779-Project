@@ -1,14 +1,14 @@
 # Golden Gate Gateway
 
-**Yingxuan Hu &nbsp;|&nbsp; Jingwen Xu &nbsp;|&nbsp; King Wang &nbsp;|&nbsp; Lucas Rea**
+**Yingxuan Hu | Jingwen Xu | King Wang | Lucas Rea**
 
 ---
 
-For a service interacting with Large Language models (LLMs), there can be significant technical challenges integrating with different providers. Developers have to design endpoints to interact with each provider's unique API and schema – leading to redundancy in operations. In addition to redundancy in the codebase, if clients were to submit semantically similar queries between different providers' models (or even to the same provider and model) this may cause a significant increase in costs and response speed due to the continuous recomputation. Thus, we decided to design Golden Gate Gateway, a high-availability gateway to standardize LLM interactions. Developers can replace a string of LLM names to switch between models without the worries of query redundancy or the need of code changing; We also designed unified monitoring jogs for developers or financial teams to provide overall observability across platforms that would potentially utilize this AI gateway.
+For a service interacting with Large Language models (LLMs), there can be significant technical challenges integrating with different providers. Developers have to design endpoints to interact with each provider's unique API and schema – leading to redundancy in operations. In addition to redundancy in the codebase, if clients were to submit semantically similar queries between different providers' models (or even to the same provider and model) this may cause a significant increase in costs and response speed due to the continuous recomputation. Thus, we decided to design Golden Gate Gateway, a high-availability gateway to standardize LLM interactions. Developers can replace a string of LLM names to switch between models without the worries of query redundancy or the need of code changing. We also designed unified monitoring logs for developers or financial teams to provide overall observability across platforms that use this AI gateway.
 
 ---
 
-## Existing Solutions & Limitations
+## Motivation
 
 | Solution | Strengths | Limitations |
 |---|---|---|
@@ -48,7 +48,7 @@ For a service interacting with Large Language models (LLMs), there can be signif
 
 ## Objective and Key Features
 
-Our objective is to build a cloud-native LLM abstraction layer with semantic memory and observability. It provides a unified OpenAI-Compatible chat completions API that abstracts the differences between various LLM providers; a semantic cache to intercept and answer repeat queries, optimizing cost and speed; and a persistent monitoring log. The entire system is orchestrated via Kubernetes to ensure scalability and reliability.
+Our objective is to build a cloud-native LLM abstraction layer with semantic memory and observability. It provides a unified OpenAI-Compatible chat completions API that abstracts the differences between various LLM providers, a semantic cache to intercept and answer repeat queries, optimizing cost and speed, and a persistent monitoring log. The entire system is orchestrated via Kubernetes to ensure scalability and reliability.
 
 ### Core Features
 
@@ -64,7 +64,7 @@ Other necessary services like authentication are also provided for reliability.
 
 #### Semantic Search
 
-For every request, the gateway will convert it into a vector embedding, and maintain it in PostgreSQL with pgvector; A similarity search will be performed in the database by the unified endpoint, returning cached responses for 95% similarity matches which bypasses the LLM provider entirely. Persistent storage is intentionally designed and maintained to keep all the queries for a long-run.
+For every request, the gateway will convert it into a vector embedding, and maintain it in PostgreSQL with pgvector. A similarity search will be performed in the database by the unified endpoint, returning cached responses for 95% similarity matches which bypasses the LLM provider entirely. Persistent storage is intentionally designed and maintained to keep all the queries for a long-run.
 
 #### Orchestration Approach
 
@@ -105,7 +105,7 @@ The followings are the details of project requirement fulfillment:
 
 | Course Requirement | G3 Implementation Detail |
 |---|---|
-| **Containerization** | Multi-stage Docker builds for the FastAPI Gateway and Celery/Redis Worker (for background embedding). |
+| **Containerization** | Docker Compose for local multi-container setup, plus multi-stage Docker builds for the FastAPI Gateway and Celery/Redis Worker (for background embedding). |
 | **State Management** | PostgreSQL 16 with pgvector for both relational metadata and vector storage. |
 | **Persistence** | DigitalOcean Volumes mounted to the Postgres StatefulSet to ensure the "Cache Memory" is permanent. |
 | **Orchestration** | DigitalOcean Kubernetes (DOKS). Deployment for the API; StatefulSet for DB; ConfigMaps for provider settings. |
@@ -121,7 +121,7 @@ This project focuses on Text-based LLMs; multi-modal (image, audio, video) gener
 
 ## Tentative Plan
 
-We plan to use the first three weeks to finish system implementation, and leverage the last three weeks for testing, debugging and documentation. Here is a detailed breakdown:
+We plan to use the first three weeks for implementation and the last three weeks for testing, debugging, and documentation.
 
 | Week | Tasks | Owner |
 |---|---|---|
@@ -153,7 +153,7 @@ Overall, these architectural choices balance course alignment, practical learnin
 
 The most difficult part of our project will likely be integrating all the different components into a stable, working system. Each individual technology (FastAPI, PostgreSQL, Kubernetes, Prometheus, etc.) is manageable on its own, but combining them introduces many possible points of failure. Since our project includes both application logic and infrastructure configuration, small mistakes in one layer can easily affect the entire system.
 
-On the application side, building a unified LLM gateway is more complex than it first appears. Different providers have different request formats, authentication methods, and error responses. Creating a clean abstraction layer that translates different formats without breaking functionality will require careful design and testing. The semantic caching feature using pgvector also adds difficulty. We need to generate embeddings, store them correctly, and define an appropriate similarity threshold. If the threshold is too low, we may return incorrect cached responses; if it is too high, the cache becomes ineffective.
+On the application side, building a unified LLM gateway is more complex than it first appears. Different providers have different request formats, authentication methods, and error responses. Creating a clean abstraction layer that translates different formats without breaking functionality will require careful design and testing. The semantic caching feature using pgvector also adds difficulty. We need to generate embeddings, store them correctly, and define an appropriate similarity threshold. If the threshold is too low, we may return incorrect cached responses, and if it is too high, the cache becomes ineffective.
 
 On the infrastructure side, Kubernetes configuration is expected to be challenging. We need to correctly set up Deployments for the API, a StatefulSet for PostgreSQL, PersistentVolumes for data durability, and Services for networking. Any misconfiguration in environment variables, secrets, storage, or service routing could cause deployment failures. In addition, configuring Horizontal Pod Autoscaling and ensuring that Prometheus can scrape metrics from scaling pods adds another layer of complexity.
 
@@ -166,10 +166,12 @@ Overall, the biggest challenge is not one specific technology, but making sure a
 
 Our initial development strategy was to build the project incrementally, starting from a minimal working system and gradually layering in more advanced features. Instead of trying to implement all components at once, we decided to first focus on establishing a stable core: a simple FastAPI gateway connected to PostgreSQL, containerized with Docker Compose for local development. We believe that having a small but functional end-to-end pipeline early would reduce integration risk later and allow us to test assumptions before introducing additional complexity such as k8s orchestration, autoscaling, and observability.
 
-Once the core request flow is working (API request → provider call → response stored in database), we planned to add the semantic caching layer using pgvector. This staged approach helps isolate potential issues; for example, if caching behaves incorrectly, we can debug it without questioning whether the infrastructure or provider integration is the cause. After the backend logic is stable, we intend to shift focus to deployment on DigitalOcean Kubernetes and then integrate monitoring and autoscaling features.
+Once the core request flow is working (API request → provider call → response stored in database), we planned to add the semantic caching layer using pgvector. This staged approach helps isolate potential issues, for example, if caching behaves incorrectly, we can debug it without questioning whether the infrastructure or provider integration is the cause. After the backend logic is stable, we intend to shift focus to deployment on DigitalOcean Kubernetes and then integrate monitoring and autoscaling features.
 
 In terms of team responsibilities, we aimed to divide work by logical system boundaries rather than by tools alone. One team member would focus primarily on backend API design and provider abstraction, ensuring clean request handling and translation logic. Another member would take ownership of infrastructure and orchestration, including Kubernetes manifests, persistent volumes, secrets management, and autoscaling. The last two members would focus on the database schema, semantic caching implementation, and observability setup (Prometheus metrics and Grafana dashboards). This division allows each member to specialize while still requiring collaboration at integration points.
 
 ---
 
 ## AI Assistance Disclosure
+
+Motivation and Independent Reasoning were written without AI. AI helped with wording checks. It suggested pgvector caching, accepted after threshold tuning review.
