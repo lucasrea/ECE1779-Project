@@ -4,7 +4,7 @@
 
 ---
 
-For a service interacting with Large Language models (LLMs), there can be significant technical challenges when integrating with different model providers. Developers have to design endpoints to interact with each provider's unique API and schema – leading to redundancy in operations. In addition to redundancy in the codebase, if clients were to submit semantically similar queries between different providers' models (or even to the same provider and model) this may cause a significant increase in costs and response speed due to the continuous recomputation. Thus, we decided to design Golden Gate Gateway, a high-availability gateway to standardize LLM interactions. Developers can replace a string of LLM names to switch between models without the worries of query redundancy or the need of code changing. We also designed unified monitoring logs for developers or financial teams to provide overall observability across platforms that use this AI gateway.
+For a service interacting with Large Language models (LLMs), there can be technical challenges when integrating with different providers. Developers have to design endpoints to interact with each provider's unique API and schema – leading to redundancy in operations. In addition to redundancy in the codebase, if clients submit semantically similar queries between different providers' models (or even to the same provider and model) this may cause a significant increase in costs and response speed due to the continuous recomputation. Thus, we decided to design Golden Gate Gateway, a high-availability gateway to standardize LLM interactions. Developers can replace a string of LLM names to switch between models without the worries of query redundancy or the need of code changing. We also designed unified monitoring logs for developers or financial teams to provide overall observability across platforms that use this AI gateway.
 
 ---
 
@@ -49,7 +49,7 @@ For a service interacting with Large Language models (LLMs), there can be signif
 
 ## Objective and Key Features
 
-Our objective is to build a cloud-native LLM abstraction layer with semantic memory and observability. It provides a unified OpenAI-Compatible chat completions API that abstracts the differences between various LLM providers, a semantic cache to intercept and answer repeat queries, optimizing cost and speed, and a persistent monitoring log. The entire system is orchestrated via Kubernetes to ensure scalability and reliability.
+Our objective is to build a cloud-native LLM abstraction layer with semantic memory and observability. It provides a unified OpenAI-Compatible chat completions API that abstracts differences between LLM providers, a semantic cache to intercept and answer repeat queries, optimizing cost and speed, and a persistent monitoring log. The system is orchestrated via Kubernetes to ensure scalability and reliability.
 
 ### Core Features
 
@@ -165,7 +165,7 @@ Overall, the biggest challenge is not one specific technology, but making sure a
 ### Early Development Approach
 
 
-Our initial development strategy was to build the project incrementally, starting from a minimal working system and gradually layering in more advanced features. Instead of trying to implement all components at once, we decided to first focus on establishing a stable core: a simple FastAPI gateway connected to PostgreSQL, containerized with Docker Compose for local development. We believe that having a small but functional end-to-end pipeline early would reduce integration risk later and allow us to test assumptions before introducing additional complexity such as k8s orchestration, autoscaling, and observability.
+Our initial development strategy was to build the project incrementally, starting from a minimal working system and gradually layering in more advanced features. Instead of trying to implement all components at once, we first focused on establishing a stable core: a simple FastAPI gateway connected to PostgreSQL, containerized with Docker Compose for local development. We believe that having a functional end-to-end pipeline early would reduce integration risk and allow us to test assumptions before introducing additional complexity such as k8s orchestration, autoscaling, and observability.
 
 Once the core request flow is working (API request → provider call → response stored in database), we planned to add the semantic caching layer using pgvector. This staged approach helps isolate potential issues, for example, if caching behaves incorrectly, we can debug it without questioning whether the infrastructure or provider integration is the cause. After the backend logic is stable, we intend to shift focus to deployment on DigitalOcean Kubernetes and then integrate monitoring and autoscaling features.
 
@@ -175,4 +175,4 @@ In terms of team responsibilities, we aimed to divide work by logical system bou
 
 ## AI Assistance Disclosure
 
-Motivation and Independent Reasoning were written without AI. AI helped with wording checks. It suggested pgvector caching, accepted after threshold tuning review.
+Motivation and Reasonings were written without AI. AI helped with wording checks. It suggested pgvector caching, accepted after threshold tuning review.
