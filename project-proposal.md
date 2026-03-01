@@ -126,9 +126,9 @@ We plan to use the first three weeks for implementation and the last three weeks
 
 | Week | Tasks | Owner |
 |---|---|---|
-| Mar. 2nd - Mar. 8th | Chat Completion Endpoint design · Build Semantic Memory | Jingwen Xu |
+| Mar. 2nd - Mar. 8th | Chat Completion Endpoint design · Build Semantic Memory | Jingwen |
 | Mar. 9th - Mar. 15th | Maintain Unified Monitoring Logs by Prometheus · Build Grafana UI | King |
-| Mar. 16th - Mar. 22th | Containerization, Orchestration, & Deployment | Lucas, Alvin |
+| Mar. 16th - Mar. 22th | Containerization, Orchestration, & Deployment | Lucas, Yingxuan |
 | Mar. 23th - Mar. 29th | Testing & Debugging · Clean up source code · Final Report | Entire Team |
 | Mar. 30th - Apr. 4th | Final Report · AI Interaction Report · Record Video Demo · Recheck & Submit | Entire Team |
 
