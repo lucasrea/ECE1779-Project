@@ -1,15 +1,16 @@
 # Golden Gate Gateway
 
-**Yingxuan Hu | Jingwen Xu | King Wang | Lucas Rea**
+**Yingxuan Hu | Lucas Rea | King Wang | Jingwen Xu**
 
 ---
 
-For a service interacting with Large Language models (LLMs), there can be significant technical challenges integrating with different providers. Developers have to design endpoints to interact with each provider's unique API and schema – leading to redundancy in operations. In addition to redundancy in the codebase, if clients were to submit semantically similar queries between different providers' models (or even to the same provider and model) this may cause a significant increase in costs and response speed due to the continuous recomputation. Thus, we decided to design Golden Gate Gateway, a high-availability gateway to standardize LLM interactions. Developers can replace a string of LLM names to switch between models without the worries of query redundancy or the need of code changing. We also designed unified monitoring logs for developers or financial teams to provide overall observability across platforms that use this AI gateway.
+For a service interacting with Large Language models (LLMs), there can be significant technical challenges when integrating with different model providers. Developers have to design endpoints to interact with each provider's unique API and schema – leading to redundancy in operations. In addition to redundancy in the codebase, if clients were to submit semantically similar queries between different providers' models (or even to the same provider and model) this may cause a significant increase in costs and response speed due to the continuous recomputation. Thus, we decided to design Golden Gate Gateway, a high-availability gateway to standardize LLM interactions. Developers can replace a string of LLM names to switch between models without the worries of query redundancy or the need of code changing. We also designed unified monitoring logs for developers or financial teams to provide overall observability across platforms that use this AI gateway.
 
 ---
 
 ## Motivation
 
+### Existing Solutions
 | Solution | Strengths | Limitations |
 |---|---|---|
 | **LLM Gateway (theopenco)** | Unified API, many providers, cost tracking | No cross-provider caching, limited observability, self-hosting complexity |
@@ -30,7 +31,7 @@ For a service interacting with Large Language models (LLMs), there can be signif
    - Safety settings
    - System prompt handling
 
-   No gateway fully normalizes these.
+   No gateway fully normalizes these nor makes them user friendly.
 
 3. **Enterprise-grade observability for finance teams**
    Most gateways track cost per request, but none provide:
@@ -54,17 +55,17 @@ Our objective is to build a cloud-native LLM abstraction layer with semantic mem
 
 #### Unified API
 
-This is an abstraction that layer exposes a single endpoint(e.g. /v1/chat/completions) that follows the OpenAI specification. It embeds a transformation engine that maps the incoming JSON request to a specific format which is required by the downstream provider. For example, it converts OpenAI messages into Anthropic prompt, changing one format to the other. In this case, users can switch from gpt-4o to claude-3-opus by simply changing a string in their request header, without changing their application code.
+This is an abstraction layer that exposes a single endpoint(e.g. /v1/chat/completions) that follows the OpenAI specification. It embeds a transformation engine that maps the incoming JSON request to a specific format which is required by the downstream provider. For example, it shall convert OpenAI-formatted requests into Anthropic requests. In this case, users can switch from `GPT-5.2` to `Claude-4.6-Opus` by simply changing a string in their request header, without changing their application code or request body and parameters.
 
 This endpoint also supports streaming and non-streaming responses across providers.
 
-If OpenAI response is server error with 500 code, the gateway automatically retries the request with Anthropic.
+If the OpenAI response returns an error with a 500 code, the gateway shall automatically retries the request with Anthropic.
 
 Other necessary services like authentication are also provided for reliability.
 
 #### Semantic Search
 
-For every request, the gateway will convert it into a vector embedding, and maintain it in PostgreSQL with pgvector. A similarity search will be performed in the database by the unified endpoint, returning cached responses for 95% similarity matches which bypasses the LLM provider entirely. Persistent storage is intentionally designed and maintained to keep all the queries for a long-run.
+For every request, the gateway will convert it into a vector embedding, and maintain it in PostgreSQL with pgvector. A similarity search will be performed in the database by the unified endpoint, returning cached responses for 95% similarity matches which bypasses the LLM provider entirely. Persistent storage is maintained to keep all the queries for a long-run.
 
 #### Orchestration Approach
 
@@ -95,13 +96,13 @@ Prometheus collects the metrics from the gateway, a Grafana dashboard will visua
 #### Advanced Features
 
 - **Auto-scaling:** more pods in DOKS will be triggered during high traffic.
-- **Secret Management:** Kubernetes Secrets will be used for high security.
+- **Secret Management:** Kubernetes Secrets will be used for increased security.
 
 ---
 
 ## Course Requirement Fulfillment
 
-The followings are the details of project requirement fulfillment:
+The following are the details of project's requirements:
 
 | Course Requirement | G3 Implementation Detail |
 |---|---|
@@ -115,7 +116,7 @@ The followings are the details of project requirement fulfillment:
 
 ---
 
-This project focuses on Text-based LLMs; multi-modal (image, audio, video) generation is out of scope to ensure the 2-month timeline is met. Our deployment priority is the Kubernetes Manifests, Persistent Volumes, and Load Balancing logic. These constraints and scope clarification makes our project pragmatic within the project timeframe.
+This project focuses on Text-based LLMs; multi-modal (image, audio, video) generation is out of scope to ensure the 2-month timeline is met. Our deployment priority is the Kubernetes Manifests, Persistent Volumes, and Load Balancing. These constraints and scope clarification makes our project reasonable within the project timeframe.
 
 ---
 
@@ -127,9 +128,9 @@ We plan to use the first three weeks for implementation and the last three weeks
 |---|---|---|
 | Mar. 2nd - Mar. 8th | Chat Completion Endpoint design · Build Semantic Memory | Jingwen Xu |
 | Mar. 9th - Mar. 15th | Maintain Unified Monitoring Logs by Prometheus · Build Grafana UI | King |
-| Mar. 16th - Mar. 22th | Containerization & Orchestration | |
-| Mar. 23th - Mar. 29th | Testing & Debugging · Clean up source code · Final Report | |
-| Mar. 30th - Apr. 4th | Final Report · AI Interaction Report · Record Video Demo · Recheck & Submit | |
+| Mar. 16th - Mar. 22th | Containerization, Orchestration, & Deployment | Lucas, Alvin |
+| Mar. 23th - Mar. 29th | Testing & Debugging · Clean up source code · Final Report | Entire Team |
+| Mar. 30th - Apr. 4th | Final Report · AI Interaction Report · Record Video Demo · Recheck & Submit | Entire Team |
 
 ---
 
