@@ -1,0 +1,3 @@
+# [endpoint]
+fastapi
+uviorn[standard]
