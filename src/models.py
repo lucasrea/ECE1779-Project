@@ -1,25 +1,19 @@
 from typing import Optional
+from pydantic import BaseModel
 import openai
+# import gemini
 
-from semantic_cache import SemanticCache
+from src.semantic_cache import SemanticCache
 
-class ChatMessage:
-    def __init__(self, role: str, content: str):
-        self.role = role  # "system", "user", or "assistant"
-        self.content = content
+class ChatMessage(BaseModel):
+    role: str  # "system", "user", or "assistant"
+    content: str
 
-class ChatCompletionRequest:
-    def __init__(
-            self, 
-            model: str, 
-            messages: list[ChatMessage],
-            temperature: float = 1.0,
-            max_tokens: Optional[int] = 2048,
-        ):
-        self.model = model
-        self.messages = messages
-        self.temperature = temperature
-        self.max_tokens = max_tokens
+class ChatCompletionRequest(BaseModel):
+    model: str
+    messages: list[ChatMessage]
+    temperature: float = 1.0
+    max_tokens: Optional[int] = 2048,
 
 class BaseProvider(SemanticCache):
     async def to_provider_format(self, request: ChatCompletionRequest):
@@ -65,15 +59,26 @@ class OpenAI(BaseProvider):
 class GoogleGemini():
     async def to_provider_format(self, request):
         # transform ChatCompletionRequest to Google Gemini format
-        pass
+        return {
+            "model": request.model,
+            "messages": [m.dict() for m in request.messages],
+            "temperature": request.temperature,
+            "max_tokens": request.max_tokens,
+        }
 
     async def call(self, payload):
         # call Google Gemini API
+        # return await gemini.chat.completions.create(**payload)
         pass
 
     async def normalize(self, response):
         # transform Google Gemini response to normalized format
-        pass
+        return {
+            "id": response.id,
+            "content": response.choices[0].message.content,
+            "model": response.model,
+            "usage": response.usage,
+        }
 
 class Anthropic():
     async def to_provider_format(self, request):

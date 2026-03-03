@@ -1,0 +1,11 @@
+# [endpoint]
+fastapi
+uvicorn
+
+# [test]
+pytest
+
+# [models]
+openai
+# anthropic
+# gemini

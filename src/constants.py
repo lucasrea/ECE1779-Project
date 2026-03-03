@@ -1,4 +1,4 @@
-from models import OpenAI, GoogleGemini, Anthropic
+from src.models import OpenAI, GoogleGemini, Anthropic
 
 PROVIDER_REGISTRY = {
     "gpt-5.2": OpenAI(),

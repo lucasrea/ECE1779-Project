@@ -1,12 +1,10 @@
-from http.client import HTTPException
+from fastapi import APIRouter, HTTPException, FastAPI
+from src.models import ChatCompletionRequest, OpenAI, GoogleGemini, Anthropic
+from src.constants import PROVIDER_REGISTRY
 
-from fastapi import APIRouter
-from models import ChatCompletionRequest, OpenAI, GoogleGemini, Anthropic
-from constants import PROVIDER_REGISTRY
+router = APIRouter()
 
-app = APIRouter()
-
-@app.post("/chat")
+@router.post("/chat")
 async def chat(request: ChatCompletionRequest):
     provider = PROVIDER_REGISTRY.get(request.model)
     if not provider:
@@ -41,3 +39,6 @@ async def chat(request: ChatCompletionRequest):
     await provider.cache_store(request, normalized)
 
     return normalized
+
+app = FastAPI()
+app.include_router(router)
