@@ -7,5 +7,5 @@ pytest
 
 # [models]
 openai
-# anthropic
-# gemini
+google-genai
+
