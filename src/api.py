@@ -2,7 +2,7 @@ import datetime
 from datetime import time, timezone
 
 from fastapi import HTTPException, FastAPI
-from src.models import Chat, OpenAI, GoogleGemini, Anthropic
+from src.models import Chat, OpenAI, Gemini, Anthropic
 from src.constants import PROVIDER_REGISTRY
 
 app = FastAPI()    
@@ -39,7 +39,7 @@ async def chat(request: Chat):
     request_formatted = provider.to_provider_format(request)
     # call the provider
     try:
-        response = await provider.call(session["chat_history"])
+        response = await provider.call(request_formatted)
         session["chat_history"].append({
             "role": "assistant", 
             "content": response, 
@@ -54,7 +54,7 @@ async def chat(request: Chat):
         if response.status_code >= 500:
             response = Anthropic().call(request_formatted)
             if response.status_code >= 500:
-                response = GoogleGemini().call(request_formatted)
+                response = Gemini().call(request_formatted)
                 if response.status_code >= 500:
                     raise HTTPException(500, "All providers failed")
         

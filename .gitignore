@@ -2,26 +2,6 @@
 # Python
 # -------------------------
 __pycache__/
-<<<<<<< HEAD
-*.py[cod]
-*.pyo
-*.pyd
-*.pdb
-*.egg-info/
-*.egg
-*.manifest
-*.spec
-
-# environments
-.env
-.env. *
-
-# Byte-compiled / optimized / DLL files
-*.so
-*.dll
-*.dylib
-=======
->>>>>>> 34f4f09d0aa2aaee62643faca2d0c1b78ec93b4d
 
 # -------------------------
 # FastAPI / Uvicorn / Logs

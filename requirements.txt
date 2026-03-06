@@ -8,4 +8,5 @@ pytest
 # [models]
 openai
 google-genai
+anthropic
 
