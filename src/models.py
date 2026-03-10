@@ -51,7 +51,7 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 
-class OpenAI(BaseProvider):
+class OpenAIProvider(BaseProvider):
     async def to_provider_format(self, session_history):
         # transform ChatCompletionRequest to OpenAI format
         return {
@@ -67,7 +67,7 @@ class OpenAI(BaseProvider):
         response = await anyio.to_thread.run_sync(lambda: client.chat.completions.create(**payload))
         return response.choices[0].message.content
 
-class Gemini():
+class GeminiProvider():
     async def to_provider_format(self, session_history):
         text = "\n".join([f"{m['role']}: {m['content']}" for m in session_history])
         return {
@@ -91,7 +91,7 @@ class Gemini():
         )
         return response.text
 
-class Anthropic(BaseProvider):
+class AnthropicProvider(BaseProvider):
     async def to_provider_format(self, session_history):
         # transform ChatCompletionRequest to OpenAI format
         message = [[{"role": session_history[0]["role"], "content": session_history[0]["content"]}]]

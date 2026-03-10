@@ -2,10 +2,10 @@ import datetime
 from datetime import time, timezone
 
 from fastapi import HTTPException, FastAPI
-from src.models import Chat, OpenAI, Gemini, Anthropic
+from src.models import Chat, OpenAIProvider, GeminiProvider, AnthropicProvider
 from src.constants import PROVIDER_REGISTRY
 
-app = FastAPI()    
+app = FastAPI()
 
 @app.post("/chat")
 # @limiter.limit("10/minute; 1000/day")
@@ -50,11 +50,11 @@ async def chat(request: Chat):
         session["last_updated"] = timestamp
     except Exception:
         # try OpenAI, if 500, fallback to Anthropic, if 500, fallback to Google Gemini
-        response = OpenAI().call(request_formatted)
+        response = await OpenAIProvider().call(request_formatted)
         if response.status_code >= 500:
-            response = Anthropic().call(request_formatted)
+            response = await AnthropicProvider().call(request_formatted)
             if response.status_code >= 500:
-                response = Gemini().call(request_formatted)
+                response = await GeminiProvider().call(request_formatted)
                 if response.status_code >= 500:
                     raise HTTPException(500, "All providers failed")
         

@@ -1,7 +1,7 @@
-from src.models import OpenAI, Gemini, Claude
+from src.models import OpenAIProvider, GeminiProvider, AnthropicProvider
 
 PROVIDER_REGISTRY = {
-    "OpenAI": OpenAI(),
-    "Gemini": Gemini(),
-    "Claude": Claude(),
+    "OpenAI": OpenAIProvider(),
+    "Gemini": GeminiProvider(),
+    "Claude": AnthropicProvider(),
 }
