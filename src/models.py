@@ -83,10 +83,10 @@ class Gemini():
             lambda: client.generate_content(
                 model=payload["model"],
                 contents= {'text': payload["messages"]},
-                config=types.GenerateContentConfig({
-                    "temperature": payload["temperature"],
-                    "maxOutputTokens": payload["max_tokens"],
-                })
+                config=types.GenerateContentConfig(
+                    temperature=payload["temperature"],
+                    max_output_tokens=payload["max_tokens"],
+                )
             )
         )
         return response.text
