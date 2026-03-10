@@ -6,7 +6,7 @@ from fastapi import Depends, Query, Response
 from fastapi.params import Cookie
 from pydantic import BaseModel
 
-import openai import OpenAI
+from openai import OpenAI
 from google import genai
 from google.genai import types
 from anthropic import Anthropic
