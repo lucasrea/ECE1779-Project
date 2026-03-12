@@ -15,6 +15,7 @@ __pycache__/
 # Test & Coverage
 # -------------------------
 .pytest_cache/
+dummy_api.py
 
 # -------------------------
 # Environment & Secrets
