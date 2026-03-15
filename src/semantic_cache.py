@@ -1,9 +1,12 @@
 import json
 import os
 
+CACHE_FILE = os.getenv("SEMANTIC_CACHE_FILE", os.path.join(os.path.dirname(__file__), ".cache", "semantic_cache.json"))
+
+
 class SemanticCache:
-    def __init__(self, cache_file='/app/cache/semantic_cache.json'):
-        self.cache_file = cache_file
+    def __init__(self, cache_file=None):
+        self.cache_file = cache_file or CACHE_FILE
         self.cache = {}
         self._load_cache()
 

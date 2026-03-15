@@ -2,17 +2,17 @@
 
 install:
 	python -m pip install -r requirements.txt
-	python -m pip install pytest pytest-asyncio pytest-cov black isort flake8
+	python -m pip install pytest pytest-asyncio pytest-cov httpx black isort flake8
 
 test:
 	python -m pytest -q
 
 coverage:
-	pytest --cov=./ --cov-report=term-missing
+	pytest --cov=src --cov-report=term-missing
 
 lint:
-	flake8 app tests
+	flake8 src test
 
 format:
-	black app tests
-	isort app tests
+	black src test
+	isort src test

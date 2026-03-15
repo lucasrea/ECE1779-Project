@@ -1,12 +1,17 @@
 # [endpoint]
 fastapi
 uvicorn
+pydantic
+anyio
+python-dotenv
 
-# [test]
-pytest
-
-# [models]
+# [providers]
 openai
 google-genai
 anthropic
 
+# [test]
+pytest
+pytest-asyncio
+pytest-cov
+httpx

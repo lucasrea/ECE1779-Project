@@ -1,68 +1,69 @@
-import datetime
-from datetime import time, timezone
+import logging
 
-from fastapi import HTTPException, FastAPI
-from src.models import Chat, OpenAI, Gemini, Anthropic
-from src.constants import PROVIDER_REGISTRY
+from dotenv import load_dotenv
+load_dotenv()
 
-app = FastAPI()    
+from fastapi import FastAPI, Header, HTTPException
 
-@app.post("/chat")
-# @limiter.limit("10/minute; 1000/day")
-async def chat(request: Chat):
-    provider = PROVIDER_REGISTRY.get(request.input.provider)
-    if not provider:
-        raise HTTPException(400, f"Unsupported model: {request.input.provider}")
-    
-    timestamp = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
-    session = {
-        "id": request.session_id,
-        "user_id": request.user_id,
-        "created_at": timestamp,
-        "chat_history": [],
-    }
+from src.models import ChatRequest
+from src.registry import PROVIDER_REGISTRY
+import src.models  # noqa: F401  — triggers @register_provider decorators
 
-    # semantic cache lookup
-    cached = provider.cache_lookup(session["chat_history"], request.input.message)
+app = FastAPI(title="Golden Gate Gateway")
+
+FALLBACK_ORDER = ["openai", "anthropic", "gemini"]
+DEFAULT_MODELS = {
+    "openai": "gpt-4.1",
+    "anthropic": "claude-haiku-4-5",
+    "gemini": "gemini-2.5-flash",
+}
+
+
+@app.post("/v1/chat/completions")
+async def chat_completions(
+    request: ChatRequest,
+    x_provider: str = Header(...),
+    x_model: str = Header(...),
+):
+    provider_cls = PROVIDER_REGISTRY.get(x_provider.lower())
+    if not provider_cls:
+        raise HTTPException(400, f"Unknown provider: {x_provider}")
+
+    provider = provider_cls()
+
+    # Semantic cache lookup
+    cached = provider.cache_lookup(request.messages)
     if cached:
-        response = cached
-    else:
-        session["chat_history"].append({
-            "role": "user", 
-            "content": request.input.message, 
-            "timestamp": timestamp, 
-            "provider": request.input.provider
-        })
-    
-    # if not cached, call the provider
-    # transform messages to provider format
-    request_formatted = provider.to_provider_format(request)
-    # call the provider
+        return cached
+
+    # Transform to provider-native format and call
+    payload = provider.to_provider_format(request, model=x_model)
     try:
-        response = await provider.call(request_formatted)
-        session["chat_history"].append({
-            "role": "assistant", 
-            "content": response, 
-            "timestamp": timestamp ,
-            "provider": request.input.provider
-        })
-        session["last_active"] = int(time.time())
-        session["last_updated"] = timestamp
+        raw_response = await provider.call(payload)
+        response = provider.normalize(raw_response)
     except Exception:
-        # try OpenAI, if 500, fallback to Anthropic, if 500, fallback to Google Gemini
-        response = OpenAI().call(request_formatted)
-        if response.status_code >= 500:
-            response = Anthropic().call(request_formatted)
-            if response.status_code >= 500:
-                response = Gemini().call(request_formatted)
-                if response.status_code >= 500:
-                    raise HTTPException(500, "All providers failed")
-        
+        logging.exception("Primary provider %s failed, entering fallback chain", x_provider)
+        response = await _fallback_chain(request, skip=x_provider.lower())
 
-    # store in semantic cache (TODO)
-    await provider.cache_store(session["id"], session, request.user_id)
+    # Store in semantic cache
+    provider.cache_store(request.messages, response)
 
-    return {
-        "session_id": session["id"],
-        "response": response,
-    }
+    return response
+
+
+async def _fallback_chain(request: ChatRequest, skip: str) -> dict:
+    for name in FALLBACK_ORDER:
+        if name == skip:
+            continue
+        provider_cls = PROVIDER_REGISTRY.get(name)
+        if not provider_cls:
+            continue
+        provider = provider_cls()
+        payload = provider.to_provider_format(request, model=DEFAULT_MODELS[name])
+        try:
+            raw = await provider.call(payload)
+            return provider.normalize(raw)
+        except Exception:
+            logging.exception("Fallback provider %s failed", name)
+            continue
+    raise HTTPException(500, "All providers failed")

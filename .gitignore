@@ -32,6 +32,12 @@ __pycache__/
 .DS_Store
 
 # -------------------------
+# Virtual environment
+# -------------------------
+.venv/
+
+# -------------------------
 # Project-specific
 # -------------------------
 CACHEDIR.TAG
+src/.cache/
