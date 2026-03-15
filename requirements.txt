@@ -1,0 +1,17 @@
+# [endpoint]
+fastapi
+uvicorn
+pydantic
+anyio
+python-dotenv
+
+# [providers]
+openai
+google-genai
+anthropic
+
+# [test]
+pytest
+pytest-asyncio
+pytest-cov
+httpx
