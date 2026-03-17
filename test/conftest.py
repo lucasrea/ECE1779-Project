@@ -11,9 +11,14 @@ from src.api import app  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
-def _isolate_cache(tmp_path, monkeypatch):
-    """Give each test its own empty cache file so tests don't leak state."""
-    monkeypatch.setattr("src.semantic_cache.CACHE_FILE", str(tmp_path / "cache.json"))
+def _mock_cache():
+    """Mock the global semantic cache so tests never hit a real DB."""
+    with patch("src.api.semantic_cache") as mock:
+        mock.get = AsyncMock(return_value=None)
+        mock.set = AsyncMock(return_value=None)
+        mock.init = AsyncMock(return_value=None)
+        mock.close = AsyncMock(return_value=None)
+        yield mock
 
 
 @pytest.fixture

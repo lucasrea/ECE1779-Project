@@ -76,10 +76,10 @@ async def test_gemini_call(client, mock_gemini_call):
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_cache_hit(client):
+async def test_cache_hit(client, _mock_cache):
     cached = {"choices": [{"message": {"role": "assistant", "content": "cached"}}], "usage": {}}
-    with patch("src.models.OpenAIProvider.cache_lookup", return_value=cached):
-        resp = client.post("/v1/chat/completions", json=BODY, headers=OPENAI_HEADERS)
+    _mock_cache.get = AsyncMock(return_value=cached)
+    resp = client.post("/v1/chat/completions", json=BODY, headers=OPENAI_HEADERS)
     assert resp.status_code == 200
     assert resp.json()["choices"][0]["message"]["content"] == "cached"
 

@@ -1,5 +1,4 @@
-from datetime import datetime, timezone
-import time
+from contextlib import asynccontextmanager
 import logging
 
 from dotenv import load_dotenv
@@ -9,9 +8,8 @@ from fastapi import FastAPI, Header, HTTPException
 
 from src.models import ChatRequest
 from src.registry import PROVIDER_REGISTRY
+from src.semantic_cache import semantic_cache
 import src.models  # noqa: F401  — triggers @register_provider decorators
-
-app = FastAPI(title="Golden Gate Gateway")
 
 FALLBACK_ORDER = ["openai", "anthropic", "gemini"]
 DEFAULT_MODELS = {
@@ -19,6 +17,16 @@ DEFAULT_MODELS = {
     "anthropic": "claude-haiku-4-5",
     "gemini": "gemini-2.5-flash",
 }
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await semantic_cache.init()
+    yield
+    await semantic_cache.close()
+
+
+app = FastAPI(title="Golden Gate Gateway", lifespan=lifespan)
 
 
 @app.post("/v1/chat/completions")
@@ -33,8 +41,8 @@ async def chat_completions(
 
     provider = provider_cls()
 
-    # Semantic cache lookup
-    cached = provider.cache_lookup(request.messages)
+    # Semantic cache lookup (cross-provider)
+    cached = await semantic_cache.get(request.messages)
     if cached:
         return cached
 
@@ -48,7 +56,7 @@ async def chat_completions(
         response = await _fallback_chain(request, skip=x_provider.lower())
 
     # Store in semantic cache
-    provider.cache_store(request.messages, response)
+    await semantic_cache.set(request.messages, response)
 
     return response
 

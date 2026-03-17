@@ -10,6 +10,11 @@ openai
 google-genai
 anthropic
 
+# [semantic cache]
+asyncpg
+pgvector
+numpy
+
 # [Observability]
 prometheus-fastapi-instrumentator
 # [test]
