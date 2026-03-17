@@ -1,14 +1,7 @@
 import logging
 import os
 
-<<<<<<< HEAD
-from openai import OpenAI
-from google import genai
-from google.genai import types
-from anthropic import Anthropic
-=======
 from pydantic import BaseModel
->>>>>>> origin/main
 import anyio
 
 from src.semantic_cache import SemanticCache
@@ -60,11 +53,6 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 
-<<<<<<< HEAD
-class OpenAIProvider(BaseProvider):
-    async def to_provider_format(self, session_history):
-        # transform ChatCompletionRequest to OpenAI format
-=======
 
 # ---------------------------------------------------------------------------
 # OpenAI — near pass-through
@@ -73,7 +61,6 @@ class OpenAIProvider(BaseProvider):
 @register_provider("openai")
 class OpenAIProvider(BaseProvider):
     def to_provider_format(self, request: ChatRequest, model: str) -> dict:
->>>>>>> origin/main
         return {
             "model": model,
             "messages": [m.model_dump() for m in request.messages],
@@ -81,53 +68,16 @@ class OpenAIProvider(BaseProvider):
             "max_completion_tokens": request.max_tokens,
         }
 
-<<<<<<< HEAD
-    async def call(self, payload):
-        client = OpenAI(api_key=OPENAI_API_KEY)
-        logging.info(f"Calling OpenAI")
-        response = await anyio.to_thread.run_sync(lambda: client.chat.completions.create(**payload))
-        return response.choices[0].message.content
-
-class GeminiProvider():
-    async def to_provider_format(self, session_history):
-        text = "\n".join([f"{m['role']}: {m['content']}" for m in session_history])
-        return {
-            "model": "gemini-2.5-flash",
-            "messages": text,
-            "temperature": 0.7,
-            "max_tokens": 1024,
-        }
-
-    async def call(self, payload):
-        client = genai.Client(api_key=GEMINI_API_KEY)
-        response = await anyio.to_thread.run_sync(
-            lambda: client.generate_content(
-                model=payload["model"],
-                contents= {'text': payload["messages"]},
-                config=types.GenerateContentConfig(
-                    temperature=payload["temperature"],
-                    max_output_tokens=payload["max_tokens"],
-                )
-            )
-=======
     async def call(self, payload: dict):
         from openai import OpenAI as OpenAIClient
         client = OpenAIClient(api_key=OPENAI_API_KEY)
         logging.info("Calling OpenAI")
         response = await anyio.to_thread.run_sync(
             lambda: client.chat.completions.create(**payload)
->>>>>>> origin/main
         )
         return response
 
-<<<<<<< HEAD
-class AnthropicProvider(BaseProvider):
-    async def to_provider_format(self, session_history):
-        # transform ChatCompletionRequest to OpenAI format
-        message = [[{"role": session_history[0]["role"], "content": session_history[0]["content"]}]]
-=======
     def normalize(self, response) -> dict:
->>>>>>> origin/main
         return {
             "choices": [{"message": {"role": "assistant", "content": response.choices[0].message.content}}],
             "usage": {
