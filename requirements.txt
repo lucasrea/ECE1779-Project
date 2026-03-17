@@ -10,13 +10,10 @@ openai
 google-genai
 anthropic
 
-<<<<<<< HEAD
 # [Observability]
 prometheus-fastapi-instrumentator
-=======
 # [test]
 pytest
 pytest-asyncio
 pytest-cov
 httpx
->>>>>>> origin/main
