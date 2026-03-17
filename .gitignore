@@ -2,6 +2,7 @@
 # Python
 # -------------------------
 __pycache__/
+*.pyc
 
 # -------------------------
 # FastAPI / Uvicorn / Logs
@@ -14,12 +15,12 @@ __pycache__/
 # Test & Coverage
 # -------------------------
 .pytest_cache/
+dummy_api.py
 
 # -------------------------
 # Environment & Secrets
 # -------------------------
 .env
-.env.*
 
 # -------------------------
 # VS Code
@@ -41,3 +42,4 @@ __pycache__/
 # -------------------------
 CACHEDIR.TAG
 src/.cache/
+__pycache__/
