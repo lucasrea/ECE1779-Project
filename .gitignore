@@ -33,6 +33,13 @@ dummy_api.py
 .DS_Store
 
 # -------------------------
+# Virtual environment
+# -------------------------
+.venv/
+
+# -------------------------
 # Project-specific
 # -------------------------
 CACHEDIR.TAG
+src/.cache/
+__pycache__/
