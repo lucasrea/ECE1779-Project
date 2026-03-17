@@ -1,3 +1,4 @@
+import os
 import asyncio
 import json
 import logging
@@ -6,9 +7,7 @@ from prometheus_client import Counter, Histogram
 
 logger = logging.getLogger(__name__)
 
-_LITELLM_PRICING_URL = (
-    "https://raw.githubusercontent.com/BerriAI/liteLLM/main/model_prices_and_context_window.json"
-)
+_LITELLM_PRICING_URL = os.getenv("LITELLM_PRICING_JSON_URL", "https://raw.githubusercontent.com/BerriAI/liteLLM/main/model_prices_and_context_window.json")
 _REFRESH_INTERVAL_SECONDS = 24 * 60 * 60  # 24 hours
 
 # request-related
