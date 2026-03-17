@@ -18,6 +18,7 @@ EMBEDDING_DIMENSIONS = 1536
 class SemanticCache:
     def __init__(self):
         self._pool: asyncpg.Pool | None = None
+        self._openai_client = None
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -25,6 +26,15 @@ class SemanticCache:
 
     async def init(self):
         """Create the connection pool and ensure the table exists."""
+        if not DATABASE_URL:
+            raise RuntimeError(
+                "DATABASE_URL is not set. "
+                "Add it to your .env file (see .env.example)."
+            )
+
+        from openai import OpenAI
+        self._openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
         self._pool = await asyncpg.create_pool(
             DATABASE_URL,
             min_size=2,
@@ -64,11 +74,10 @@ class SemanticCache:
     # ------------------------------------------------------------------
 
     async def _embed(self, text: str) -> np.ndarray:
-        from openai import OpenAI
-
-        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         response = await anyio.to_thread.run_sync(
-            lambda: client.embeddings.create(model=EMBEDDING_MODEL, input=text)
+            lambda: self._openai_client.embeddings.create(
+                model=EMBEDDING_MODEL, input=text
+            )
         )
         return np.array(response.data[0].embedding)
 
