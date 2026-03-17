@@ -123,7 +123,7 @@ async def _refresh_prices() -> None:
                 entry = data.get("claude-haiku-4-5-20251001")
             else:
                 entry = data.get(model)
-            
+
             if entry and "output_cost_per_token" in entry:
                 _OUTPUT_PRICE_PER_TOKEN[model] = entry["output_cost_per_token"]
                 updated.append(model)
@@ -132,8 +132,39 @@ async def _refresh_prices() -> None:
         logger.warning(f"Price refresh failed, keeping existing values: {exc}")
 
 
-async def start_price_refresh_loop() -> None:
-    """Call once at app startup. Refreshes prices immediately, then every 24 h."""
+_price_refresh_task: asyncio.Task | None = None
+
+
+async def _price_refresh_worker() -> None:
+    """Background worker that periodically refreshes prices."""
     while True:
         await _refresh_prices()
-        await asyncio.sleep(_REFRESH_INTERVAL_SECONDS)
+        try:
+            await asyncio.sleep(_REFRESH_INTERVAL_SECONDS)
+        except asyncio.CancelledError:
+            # Allow clean shutdown when the task is cancelled.
+            break
+
+
+async def start_price_refresh_loop() -> None:
+    """
+    Call once at app startup.
+
+    Schedules a background task that refreshes prices immediately, then every 24 h.
+    Safe to `await` during startup; this function returns after scheduling the task.
+    """
+    global _price_refresh_task
+    if _price_refresh_task is None or _price_refresh_task.done():
+        _price_refresh_task = asyncio.create_task(_price_refresh_worker())
+
+
+async def stop_price_refresh_loop() -> None:
+    """Cancel the background price refresh loop, if running, and wait for it to finish."""
+    global _price_refresh_task
+    if _price_refresh_task is not None and not _price_refresh_task.done():
+        _price_refresh_task.cancel()
+        try:
+            await _price_refresh_task
+        except asyncio.CancelledError:
+            pass
+    _price_refresh_task = None
