@@ -1,4 +1,14 @@
+import os
+import asyncio
+import json
+import logging
+import urllib.request
 from prometheus_client import Counter, Histogram
+
+logger = logging.getLogger(__name__)
+
+_LITELLM_PRICING_URL = os.getenv("LITELLM_PRICING_JSON_URL", "https://raw.githubusercontent.com/BerriAI/liteLLM/main/model_prices_and_context_window.json")
+_REFRESH_INTERVAL_SECONDS = 24 * 60 * 60  # 24 hours
 
 # request-related
 llm_requests_total = Counter(
@@ -48,12 +58,6 @@ cache_cost_saved_usd_total = Counter(
 )
 
 # pricing
-# TODO: on app startup, a background asyncio task fetches the
-# community-maintained LiteLLM pricing JSON and refreshes every 24 h:
-#   URL: https://raw.githubusercontent.com/BerriAI/liteLLM/main/model_prices_and_context_window.json
-#   Key per model: {"output_cost_per_token": <float>}
-#   Wrap the fetch in try/except so failure silently falls back to these defaults.
-
 _OUTPUT_PRICE_PER_TOKEN: dict[str, float] = {
     "gpt-4.1":          8.00 / 1_000_000,   # $8.00 / 1M output tokens
     "gemini-2.5-flash": 0.60 / 1_000_000,   # $0.60 / 1M output tokens
@@ -63,7 +67,6 @@ _OUTPUT_PRICE_PER_TOKEN: dict[str, float] = {
 _DEFAULT_OUTPUT_PRICE = 5.00 / 1_000_000    # conservative fallback
 
 # Maps PROVIDER_REGISTRY key → model name used in metric labels.
-# Kept in sync with the model strings in models.py.
 _PROVIDER_MODEL: dict[str, str] = {
     "OpenAI": "gpt-4.1",
     "Gemini": "gemini-2.5-flash",
@@ -104,3 +107,64 @@ def record_provider_call(provider: str, model: str, status: str, duration: float
     """Call this to record time-taken and result of calling a model."""
     llm_requests_total.labels(provider=provider, model=model, status=status).inc()
     llm_request_duration_seconds.labels(provider=provider, model=model).observe(duration)
+
+
+async def _refresh_prices() -> None:
+    """Fetch latest output token prices from LiteLLM and update _OUTPUT_PRICE_PER_TOKEN."""
+    def _fetch() -> dict:
+        with urllib.request.urlopen(_LITELLM_PRICING_URL, timeout=10) as resp:
+            return json.loads(resp.read().decode())
+
+    try:
+        data = await asyncio.to_thread(_fetch)
+        updated = []
+        for model in list(_PROVIDER_MODEL.values()):
+            if model == "claude-haiku-4-5":
+                entry = data.get("claude-haiku-4-5-20251001")
+            else:
+                entry = data.get(model)
+
+            if entry and "output_cost_per_token" in entry:
+                _OUTPUT_PRICE_PER_TOKEN[model] = entry["output_cost_per_token"]
+                updated.append(model)
+        logger.info(f"Prices refreshed for: {updated}")
+    except Exception as exc:
+        logger.warning(f"Price refresh failed, keeping existing values: {exc}")
+
+
+_price_refresh_task: asyncio.Task | None = None
+
+
+async def _price_refresh_worker() -> None:
+    """Background worker that periodically refreshes prices."""
+    while True:
+        await _refresh_prices()
+        try:
+            await asyncio.sleep(_REFRESH_INTERVAL_SECONDS)
+        except asyncio.CancelledError:
+            # Allow clean shutdown when the task is cancelled.
+            break
+
+
+async def start_price_refresh_loop() -> None:
+    """
+    Call once at app startup.
+
+    Schedules a background task that refreshes prices immediately, then every 24 h.
+    Safe to `await` during startup; this function returns after scheduling the task.
+    """
+    global _price_refresh_task
+    if _price_refresh_task is None or _price_refresh_task.done():
+        _price_refresh_task = asyncio.create_task(_price_refresh_worker())
+
+
+async def stop_price_refresh_loop() -> None:
+    """Cancel the background price refresh loop, if running, and wait for it to finish."""
+    global _price_refresh_task
+    if _price_refresh_task is not None and not _price_refresh_task.done():
+        _price_refresh_task.cancel()
+        try:
+            await _price_refresh_task
+        except asyncio.CancelledError:
+            pass
+    _price_refresh_task = None
