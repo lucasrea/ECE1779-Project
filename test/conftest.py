@@ -1,8 +1,9 @@
 import os
 import sys
 from unittest.mock import AsyncMock, patch
-from fastapi.testclient import TestClient
+
 import pytest
+from fastapi.testclient import TestClient
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, ROOT)
@@ -11,14 +12,24 @@ from src.api import app  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
-def _isolate_cache(tmp_path, monkeypatch):
-    """Give each test its own empty cache file so tests don't leak state."""
-    monkeypatch.setattr("src.semantic_cache.CACHE_FILE", str(tmp_path / "cache.json"))
+def mock_cache():
+    """Provide a mock SemanticCache so tests never hit a real database."""
+    mock = AsyncMock()
+    mock.lookup = AsyncMock(return_value=None)
+    mock.store = AsyncMock(return_value=None)
+    mock.close = AsyncMock(return_value=None)
+    with patch(
+        "src.semantic_cache.SemanticCache.create",
+        new_callable=AsyncMock,
+        return_value=mock,
+    ):
+        yield mock
 
 
 @pytest.fixture
-def client():
-    return TestClient(app)
+def client(mock_cache):
+    with TestClient(app) as c:
+        yield c
 
 
 @pytest.fixture
