@@ -1,8 +1,7 @@
 .PHONY: install test lint format coverage
 
 install:
-	python -m pip install -r requirements.txt
-	python -m pip install pytest pytest-asyncio pytest-cov httpx black isort flake8
+	python -m pip install -r requirements-dev.txt
 
 test:
 	python -m pytest -q
