@@ -195,4 +195,4 @@ python simulate_traffic.py --rate 10   # faster
 python simulate_traffic.py --fail-rate 0.4 --hit-rate 0.2  # stress error panels
 ```
 
-Make sure `docker compose up -d` is running first so Prometheus scrapes the simulator's `/metrics` endpoint.
+Make sure `docker compose up -d` is running first so Prometheus scrapes the simulator's `/metrics` endpoint. By default, `prometheus_data/prometheus.yml` is configured to scrape `host.docker.internal:8000`, so either run the simulator on port 8000 or update the Prometheus scrape config to match any custom `--port` you choose.
