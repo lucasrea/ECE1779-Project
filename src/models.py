@@ -4,7 +4,6 @@ import os
 from pydantic import BaseModel
 import anyio
 
-from src.semantic_cache import SemanticCache
 from src.registry import register_provider
 
 # ---------------------------------------------------------------------------
@@ -26,7 +25,7 @@ class ChatRequest(BaseModel):
 # Base provider
 # ---------------------------------------------------------------------------
 
-class BaseProvider(SemanticCache):
+class BaseProvider:
     def to_provider_format(self, request: ChatRequest, model: str) -> dict:
         raise NotImplementedError
 
@@ -35,14 +34,6 @@ class BaseProvider(SemanticCache):
 
     def normalize(self, response: object) -> dict:
         raise NotImplementedError
-
-    def cache_lookup(self, messages: list[Message]) -> dict | None:
-        key = f"{self.__class__.__name__}_{hash(str([(m.role, m.content) for m in messages]))}"
-        return self.get(key)
-
-    def cache_store(self, messages: list[Message], response: dict) -> None:
-        key = f"{self.__class__.__name__}_{hash(str([(m.role, m.content) for m in messages]))}"
-        self.set(key, response)
 
 
 # ---------------------------------------------------------------------------
