@@ -66,11 +66,11 @@ _OUTPUT_PRICE_PER_TOKEN: dict[str, float] = {
 
 _DEFAULT_OUTPUT_PRICE = 5.00 / 1_000_000    # conservative fallback
 
-# Maps PROVIDER_REGISTRY key → model name used in metric labels.
+# Maps lowercased PROVIDER_REGISTRY key → model name used in metric labels.
 _PROVIDER_MODEL: dict[str, str] = {
-    "OpenAI": "gpt-4.1",
-    "Gemini": "gemini-2.5-flash",
-    "Claude": "claude-haiku-4-5",
+    "openai": "gpt-4.1",
+    "gemini": "gemini-2.5-flash",
+    "claude": "claude-haiku-4-5",
 }
 
 
@@ -81,8 +81,10 @@ def model_for(provider: str) -> str:
     functions before calling them.
 
     Args:
-        provider: Provider registry key. Must be one of ``"OpenAI"``,
-            ``"Gemini"``, or ``"Claude"``.
+        provider: Provider name corresponding to a PROVIDER_REGISTRY key.
+            Registry keys are stored in lowercase (e.g. ``"openai"``,
+            ``"gemini"``, ``"claude"``), but this function is
+            case-insensitive.
 
     Returns:
         The model name string (e.g. ``"gpt-4.1"``), or ``"unknown"`` if the
@@ -90,10 +92,11 @@ def model_for(provider: str) -> str:
 
     Example::
 
-        provider = "OpenAI"
+        provider = "openai"
         model = model_for(provider)   # "gpt-4.1"
     """
-    return _PROVIDER_MODEL.get(provider, "unknown")
+    provider_key = provider.lower()
+    return _PROVIDER_MODEL.get(provider_key, "unknown")
 
 
 def _estimate_tokens(text: str) -> int:
