@@ -1,0 +1,21 @@
+services:
+  prometheus:
+    image: prom/prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus_data:/etc/prometheus
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # lets Prometheus reach your app on the host
+
+  grafana:
+    image: grafana/grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/grafana_dashboard_setup.json:/var/lib/grafana/dashboards/golden_gate.json
+    depends_on:
+      - prometheus
