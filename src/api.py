@@ -6,12 +6,15 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from fastapi import FastAPI, Header, HTTPException
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from src.models import ChatRequest
 from src.registry import PROVIDER_REGISTRY
 import src.models  # noqa: F401  — triggers @register_provider decorators
 
 app = FastAPI(title="Golden Gate Gateway")
+
+Instrumentator().instrument(app).expose(app)
 
 FALLBACK_ORDER = ["openai", "anthropic", "gemini"]
 DEFAULT_MODELS = {
