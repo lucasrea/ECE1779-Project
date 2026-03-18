@@ -10,10 +10,11 @@ openai
 google-genai
 anthropic
 
+# [database / semantic cache]
+asyncpg
+pgvector
+sentence-transformers
+
 # [Observability]
 prometheus-fastapi-instrumentator
-# [test]
-pytest
-pytest-asyncio
-pytest-cov
-httpx
+prometheus-client

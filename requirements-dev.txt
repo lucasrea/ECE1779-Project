@@ -1,0 +1,12 @@
+-r requirements.txt
+
+# [test]
+pytest
+pytest-asyncio
+pytest-cov
+httpx
+
+# [lint / format]
+black
+isort
+flake8

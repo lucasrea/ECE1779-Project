@@ -1,6 +1,5 @@
-from datetime import datetime, timezone
-import time
 import logging
+from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -8,10 +7,11 @@ load_dotenv()
 from fastapi import FastAPI, Header, HTTPException
 
 from src.models import ChatRequest
+from src.semantic_cache import SemanticCache
 from src.registry import PROVIDER_REGISTRY
 import src.models  # noqa: F401  — triggers @register_provider decorators
 
-app = FastAPI(title="Golden Gate Gateway")
+logger = logging.getLogger(__name__)
 
 FALLBACK_ORDER = ["openai", "anthropic", "gemini"]
 DEFAULT_MODELS = {
@@ -19,6 +19,32 @@ DEFAULT_MODELS = {
     "anthropic": "claude-haiku-4-5",
     "gemini": "gemini-2.5-flash",
 }
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    try:
+        cache = await SemanticCache.create()
+        app.state.cache = cache
+        logger.info("Semantic cache initialized (pgvector)")
+    except Exception:
+        logger.warning(
+            "Could not connect to database; semantic cache disabled",
+            exc_info=True,
+        )
+        app.state.cache = None
+    yield
+    cache = getattr(app.state, "cache", None)
+    if cache:
+        await cache.close()
+
+
+app = FastAPI(title="Golden Gate Gateway", lifespan=lifespan)
+
+
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
 
 
 @app.post("/v1/chat/completions")
@@ -32,23 +58,25 @@ async def chat_completions(
         raise HTTPException(400, f"Unknown provider: {x_provider}")
 
     provider = provider_cls()
+    cache = getattr(app.state, "cache", None)
 
-    # Semantic cache lookup
-    cached = provider.cache_lookup(request.messages)
-    if cached:
-        return cached
+    if cache:
+        cached = await cache.lookup(request.messages)
+        if cached:
+            return cached
 
-    # Transform to provider-native format and call
     payload = provider.to_provider_format(request, model=x_model)
     try:
         raw_response = await provider.call(payload)
         response = provider.normalize(raw_response)
     except Exception:
-        logging.exception("Primary provider %s failed, entering fallback chain", x_provider)
+        logging.exception(
+            "Primary provider %s failed, entering fallback chain", x_provider,
+        )
         response = await _fallback_chain(request, skip=x_provider.lower())
 
-    # Store in semantic cache
-    provider.cache_store(request.messages, response)
+    if cache:
+        await cache.store(request.messages, response, x_provider.lower(), x_model)
 
     return response
 
