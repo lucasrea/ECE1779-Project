@@ -14,15 +14,12 @@ import src.models  # noqa: F401  — triggers @register_provider decorators
 
 logger = logging.getLogger(__name__)
 
-Instrumentator().instrument(app).expose(app)
-
 FALLBACK_ORDER = ["openai", "anthropic", "gemini"]
 DEFAULT_MODELS = {
     "openai": "gpt-4.1",
     "anthropic": "claude-haiku-4-5",
     "gemini": "gemini-2.5-flash",
 }
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -41,8 +38,9 @@ async def lifespan(app: FastAPI):
     if cache:
         await cache.close()
 
-
 app = FastAPI(title="Golden Gate Gateway", lifespan=lifespan)
+
+Instrumentator().instrument(app).expose(app)
 
 
 @app.get("/health")
