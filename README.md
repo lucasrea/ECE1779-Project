@@ -12,11 +12,30 @@ A unified, high-availability LLM gateway that exposes a single OpenAI-compatible
 
 ### Setup
 
+1. Application:
+
 ```bash
 uv venv --python 3.10
 source .venv/bin/activate
 uv pip install -r requirements.txt
 ```
+
+2. Observability (Prometheus + Grafana):
+
+Requires [Docker](https://docs.docker.com/get-docker/). From the project root:
+
+```bash
+docker compose up -d
+```
+
+| Service    | URL                   | Credentials(username/password)   |
+|------------|-----------------------|---------------|
+| Grafana    | http://localhost:3000 | admin/admin |
+| Prometheus | http://localhost:9090 | —             |
+
+The **Golden Gate Gateway - Metrics** dashboard is provisioned automatically — no manual import needed. Open Grafana and it will be available under **Dashboards**.
+
+To verify Prometheus is scraping the app, visit `http://localhost:9090/targets` — the `golden-gate-gateway` job should show **State: UP**.
 
 ### Configure
 
@@ -155,6 +174,8 @@ Client
 
 ## Tests
 
+### Unit tests
+
 ```bash
 source .venv/bin/activate
 make test
@@ -163,3 +184,15 @@ python -m pytest -q
 ```
 
 Tests mock all provider SDK calls so no API keys are needed to run them.
+
+### Metrics / Grafana
+
+Use the traffic simulator to emit fake metrics and verify all Grafana panels without real API keys:
+
+```bash
+python simulate_traffic.py              # 2 req/s, default mix
+python simulate_traffic.py --rate 10   # faster
+python simulate_traffic.py --fail-rate 0.4 --hit-rate 0.2  # stress error panels
+```
+
+Make sure `docker compose up -d` is running first so Prometheus scrapes the simulator's `/metrics` endpoint.
