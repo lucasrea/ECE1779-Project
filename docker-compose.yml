@@ -33,8 +33,12 @@ services:
     image: prom/prometheus:latest
     ports:
       - "9090:9090"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
     volumes:
       - ./prometheus_data/prometheus.yml:/etc/prometheus/prometheus.yml
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - gateway
     restart: unless-stopped
@@ -44,6 +48,7 @@ services:
     ports:
       - "3000:3000"
     volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
       - ./grafana/grafana_dashboard_setup.json:/var/lib/grafana/dashboards/dashboard.json
     depends_on:
       - prometheus

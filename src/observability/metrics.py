@@ -66,17 +66,37 @@ _OUTPUT_PRICE_PER_TOKEN: dict[str, float] = {
 
 _DEFAULT_OUTPUT_PRICE = 5.00 / 1_000_000    # conservative fallback
 
-# Maps PROVIDER_REGISTRY key → model name used in metric labels.
+# Maps lowercased PROVIDER_REGISTRY key → model name used in metric labels.
 _PROVIDER_MODEL: dict[str, str] = {
-    "OpenAI": "gpt-4.1",
-    "Gemini": "gemini-2.5-flash",
-    "Claude": "claude-haiku-4-5",
+    "openai": "gpt-4.1",
+    "gemini": "gemini-2.5-flash",
+    "claude": "claude-haiku-4-5",
 }
 
 
 def model_for(provider: str) -> str:
-    """Return the model label for a given provider registry key."""
-    return _PROVIDER_MODEL.get(provider, "unknown")
+    """Return the canonical model label for a given provider registry key.
+
+    Use this to resolve the ``model`` argument required by all ``record_*``
+    functions before calling them.
+
+    Args:
+        provider: Provider name corresponding to a PROVIDER_REGISTRY key.
+            Registry keys are stored in lowercase (e.g. ``"openai"``,
+            ``"gemini"``, ``"claude"``), but this function is
+            case-insensitive.
+
+    Returns:
+        The model name string (e.g. ``"gpt-4.1"``), or ``"unknown"`` if the
+        key is not recognised.
+
+    Example::
+
+        provider = "openai"
+        model = model_for(provider)   # "gpt-4.1"
+    """
+    provider_key = provider.lower()
+    return _PROVIDER_MODEL.get(provider_key, "unknown")
 
 
 def _estimate_tokens(text: str) -> int:
@@ -85,7 +105,32 @@ def _estimate_tokens(text: str) -> int:
 
 
 def record_cache_hit(provider: str, model: str, response_text: str) -> None:
-    """Call this when cache search hit."""
+    """Record a semantic cache hit and estimate the cost saved.
+
+    Call this immediately after a cache lookup returns a result, **instead of**
+    calling the LLM provider. Increments the cache-hit counter and estimates
+    token and USD savings from the cached response text.
+
+    Args:
+        provider: Provider registry key (e.g. ``"OpenAI"``). Used as a
+            Prometheus label — must match one of the keys in ``_PROVIDER_MODEL``.
+        model: Model name returned by :func:`model_for` (e.g. ``"gpt-4.1"``).
+        response_text: The cached response string. Used to estimate output
+            token count (``words × 1.3``) and multiply by the current output
+            token price to calculate USD saved.
+
+    Metrics updated:
+        - ``cache_hits_total`` — incremented by 1
+        - ``cache_tokens_saved_total`` — incremented by estimated token count
+        - ``cache_cost_saved_usd_total`` — incremented by ``tokens × price/token``
+
+    Example::
+
+        cached = provider.cache_lookup(messages)
+        if cached:
+            record_cache_hit("OpenAI", model_for("OpenAI"), cached["response"])
+            return cached
+    """
     tokens = _estimate_tokens(response_text)
     price = _OUTPUT_PRICE_PER_TOKEN.get(model, _DEFAULT_OUTPUT_PRICE)
     cache_hits_total.labels(provider=provider, model=model).inc()
@@ -94,17 +139,84 @@ def record_cache_hit(provider: str, model: str, response_text: str) -> None:
 
 
 def record_cache_miss(provider: str, model: str) -> None:
-    """Call this when cache search missed."""
+    """Record a semantic cache miss.
+
+    Call this when a cache lookup returns nothing and the request will proceed
+    to the LLM provider. Pair with :func:`record_provider_call` after the
+    provider responds.
+
+    Args:
+        provider: Provider registry key (e.g. ``"OpenAI"``).
+        model: Model name returned by :func:`model_for`.
+
+    Metrics updated:
+        - ``cache_misses_total`` — incremented by 1
+
+    Example::
+
+        cached = provider.cache_lookup(messages)
+        if not cached:
+            record_cache_miss("OpenAI", model_for("OpenAI"))
+            # ... call provider ...
+    """
     cache_misses_total.labels(provider=provider, model=model).inc()
 
 
 def record_transform(provider: str, model: str, duration: float) -> None:
-    """Call this to record duration of every format transformation."""
+    """Record the time spent transforming a request into provider-native format.
+
+    Call this after ``to_provider_format()`` completes, passing the wall-clock
+    duration measured with ``time.perf_counter()``. Appears in Grafana as the
+    **Transform overhead** panel.
+
+    Args:
+        provider: Provider registry key (e.g. ``"OpenAI"``).
+        model: Model name returned by :func:`model_for`.
+        duration: Elapsed time in **seconds** (float). Measure with
+            ``time.perf_counter()`` for sub-millisecond precision.
+
+    Metrics updated:
+        - ``llm_transform_duration_seconds`` — observes ``duration``
+
+    Example::
+
+        t0 = time.perf_counter()
+        payload = provider.to_provider_format(request, model=x_model)
+        record_transform("OpenAI", model_for("OpenAI"), time.perf_counter() - t0)
+    """
     llm_transform_duration_seconds.labels(provider=provider, model=model).observe(duration)
 
 
 def record_provider_call(provider: str, model: str, status: str, duration: float) -> None:
-    """Call this to record time-taken and result of calling a model."""
+    """Record the outcome and duration of a live LLM provider call.
+
+    Call this once after ``provider.call()`` resolves — whether it succeeded
+    or raised an exception. Drives the **Provider Health** and **Latency**
+    Grafana rows.
+
+    Args:
+        provider: Provider registry key (e.g. ``"OpenAI"``).
+        model: Model name returned by :func:`model_for`.
+        status: ``"success"`` if the call returned a response, ``"failure"``
+            if it raised an exception. Any other string is accepted but will
+            not match existing Grafana queries.
+        duration: Elapsed time in **seconds** (float) from just before
+            ``provider.call()`` to just after it returns or raises.
+
+    Metrics updated:
+        - ``llm_requests_total`` — incremented by 1 (labelled by status)
+        - ``llm_request_duration_seconds`` — observes ``duration``
+
+    Example::
+
+        t0 = time.perf_counter()
+        try:
+            response = await provider.call(payload)
+            record_provider_call("OpenAI", model_for("OpenAI"), "success", time.perf_counter() - t0)
+        except Exception:
+            record_provider_call("OpenAI", model_for("OpenAI"), "failure", time.perf_counter() - t0)
+            raise
+    """
     llm_requests_total.labels(provider=provider, model=model, status=status).inc()
     llm_request_duration_seconds.labels(provider=provider, model=model).observe(duration)
 

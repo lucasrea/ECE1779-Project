@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from fastapi import FastAPI, Header, HTTPException
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from src.models import ChatRequest
 from src.semantic_cache import SemanticCache
@@ -19,7 +20,6 @@ DEFAULT_MODELS = {
     "anthropic": "claude-haiku-4-5",
     "gemini": "gemini-2.5-flash",
 }
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -38,8 +38,9 @@ async def lifespan(app: FastAPI):
     if cache:
         await cache.close()
 
-
 app = FastAPI(title="Golden Gate Gateway", lifespan=lifespan)
+
+Instrumentator().instrument(app).expose(app)
 
 
 @app.get("/health")
