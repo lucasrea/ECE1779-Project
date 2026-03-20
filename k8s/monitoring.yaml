@@ -16,7 +16,7 @@ data:
 
       - job_name: "golden-gate-gateway"
         static_configs:
-          - targets: ["gateway:8000"]
+          - targets: ["gateway:80"]
         metrics_path: "/metrics"
 ---
 apiVersion: apps/v1
@@ -1370,7 +1370,10 @@ spec:
             - containerPort: 3000
           env:
             - name: GF_SECURITY_ADMIN_PASSWORD
-              value: "admin"
+              valueFrom:
+                secretKeyRef:
+                  name: gateway-secrets
+                  key: GRAFANA_ADMIN_PASSWORD
           volumeMounts:
             - name: grafana-datasources
               mountPath: /etc/grafana/provisioning/datasources
