@@ -9,11 +9,14 @@ metadata:
   name: gateway-secrets
   namespace: golden-gate
 type: Opaque
+
+# Replace these locally before deploying. Do not commit real secrets.
 stringData:
   OPENAI_API_KEY: "CHANGE_ME"
   ANTHROPIC_API_KEY: "CHANGE_ME"
   GEMINI_API_KEY: "CHANGE_ME"
   POSTGRES_PASSWORD: "password"
+  GRAFANA_ADMIN_PASSWORD: "CHANGE_ME"
 ---
 apiVersion: v1
 kind: ConfigMap

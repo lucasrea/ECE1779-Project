@@ -58,6 +58,52 @@ uvicorn src.api:app --reload
 
 The server starts at `http://localhost:8000`.
 
+## Kubernetes Deployment
+
+This repo includes a DigitalOcean Kubernetes deployment path in `k8s/`.
+
+Prerequisites:
+
+- Access to the shared DigitalOcean team and DOKS cluster
+- `doctl` installed
+- `kubectl` installed
+
+Authenticate and connect to the cluster:
+
+```bash
+doctl auth init
+doctl kubernetes cluster kubeconfig save <cluster-name>
+kubectl get nodes
+```
+
+Before applying the manifests:
+
+1. Build and push the gateway image to the shared DigitalOcean Container Registry.
+2. Update the image tag in `k8s/gateway.yaml` so it points to the exact image you pushed.
+3. Replace the placeholder values in `k8s/config.yaml` locally, especially the provider API keys and `GRAFANA_ADMIN_PASSWORD`.
+4. Do not commit real secrets.
+5. Make sure your DOKS cluster is authorized to pull from the `golden-gate` registry.
+
+Apply the manifests in this order:
+
+```bash
+kubectl apply -f k8s/config.yaml
+kubectl apply -f k8s/postgres.yaml
+kubectl apply -f k8s/gateway.yaml
+kubectl apply -f k8s/monitoring.yaml
+```
+
+Useful checks:
+
+```bash
+kubectl get pods -n golden-gate
+kubectl get svc -n golden-gate
+kubectl port-forward -n golden-gate svc/prometheus 9090:9090
+kubectl port-forward -n golden-gate svc/grafana 3000:3000
+```
+
+In Kubernetes, Prometheus scrapes the gateway at `gateway:80/metrics`, and Grafana loads the provisioned dashboard automatically.
+
 ## API Reference
 
 ### `POST /v1/chat/completions`
@@ -170,7 +216,7 @@ Client
 | `src/api.py` | FastAPI app, routing, fallback chain |
 | `src/models.py` | Pydantic schemas, provider classes (transform + call + normalize) |
 | `src/registry.py` | Self-registering provider registry via `@register_provider` decorator |
-| `src/semantic_cache.py` | JSON-file cache (placeholder for pgvector) |
+| `src/semantic_cache.py` | pgvector-backed semantic cache |
 
 ## Tests
 
