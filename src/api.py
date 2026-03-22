@@ -2,7 +2,7 @@ import logging
 import time
 import src.models  # noqa: F401  — triggers @register_provider decorators
 
-from src.models import ChatRequest
+from src.models import ChatRequest, FallBackResponse
 from src.semantic_cache import SemanticCache
 from src.registry import PROVIDER_REGISTRY
 
@@ -76,7 +76,6 @@ async def chat_completions(
         cached = await cache.lookup(request.messages)
         if cached:
             response_text = cached.get("choices", [{}])[0].get("message", {}).get("content", "")
-            
             record_cache_hit(provider_name, x_model, response_text) # record cache hit
             return cached
         else:
@@ -103,7 +102,14 @@ async def chat_completions(
         first_call_elapsed = (time.perf_counter()) - start_time # record time taken to failure
         record_provider_call(actual_provider, actual_model, "failure", first_call_elapsed)
 
-        response = await _fallback_chain(request, skip=x_provider.lower())
+        fallback_response = await _fallback_chain(request, skip=x_provider.lower(), fallback_start_time=start_time)
+
+        # extract result from fallback responser wrapper, overwrite previous metrics
+        actual_provider = fallback_response.provider
+        actual_model = fallback_response.model
+        transform_elapsed = fallback_response.transform_time
+        response = fallback_response.response
+
     
     end_time = time.perf_counter()
     call_elapsed = end_time - start_time
@@ -117,7 +123,7 @@ async def chat_completions(
     return response
 
 
-async def _fallback_chain(request: ChatRequest, skip: str) -> dict:
+async def _fallback_chain(request: ChatRequest, skip: str, fallback_start_time: float) -> FallBackResponse:
     for name in FALLBACK_ORDER:
         if name == skip:
             continue
@@ -125,11 +131,26 @@ async def _fallback_chain(request: ChatRequest, skip: str) -> dict:
         if not provider_cls:
             continue
         provider = provider_cls()
+
+        t_start = time.perf_counter()
         payload = provider.to_provider_format(request, model=DEFAULT_MODELS[name])
+        t_end = time.perf_counter()
+
+        transform_elapsed = t_end - t_start
+
         try:
             raw = await provider.call(payload)
-            return provider.normalize(raw)
+            return FallBackResponse(
+                provider=name, 
+                model=DEFAULT_MODELS[name], 
+                transform_time=transform_elapsed, 
+                response=provider.normalize(raw)
+            )
         except Exception:
             logging.exception("Fallback provider %s failed", name)
+
+            current_try_elapsed = (time.perf_counter()) - fallback_start_time  # record time taken to failure
+            record_provider_call(name, DEFAULT_MODELS[name], "failure", current_try_elapsed)
+
             continue
     raise HTTPException(500, "All providers failed")
