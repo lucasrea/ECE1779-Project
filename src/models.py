@@ -41,7 +41,7 @@ class BaseProvider:
 # Fallback response wrapper
 # ---------------------------------------------------------------------------
 
-class FallBackResponse(BaseModel):
+class FallbackResponse(BaseModel):
     provider: Literal["openai", "anthropic", "gemini"] # actual provider called
     model: str # actual model called
     transform_time: float # actual time taken for transformation

@@ -2,7 +2,7 @@ import logging
 import time
 import src.models  # noqa: F401  — triggers @register_provider decorators
 
-from src.models import ChatRequest, FallBackResponse
+from src.models import ChatRequest, FallbackResponse
 from src.semantic_cache import SemanticCache
 from src.registry import PROVIDER_REGISTRY
 
@@ -123,7 +123,7 @@ async def chat_completions(
     return response
 
 
-async def _fallback_chain(request: ChatRequest, skip: str, fallback_start_time: float) -> FallBackResponse:
+async def _fallback_chain(request: ChatRequest, skip: str, fallback_start_time: float) -> FallbackResponse:
     for name in FALLBACK_ORDER:
         if name == skip:
             continue
@@ -140,7 +140,7 @@ async def _fallback_chain(request: ChatRequest, skip: str, fallback_start_time: 
 
         try:
             raw = await provider.call(payload)
-            return FallBackResponse(
+            return FallbackResponse(
                 provider=name, 
                 model=DEFAULT_MODELS[name], 
                 transform_time=transform_elapsed, 
