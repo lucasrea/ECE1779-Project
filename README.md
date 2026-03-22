@@ -49,6 +49,60 @@ GEMINI_API_KEY="..."
 
 The server loads `.env` automatically on startup via `python-dotenv`.
 
+Optional JWT auth (off by default):
+
+```
+AUTH_ENABLED="false"
+AUTH_SHARED_SECRET=""                 # required when AUTH_ENABLED=true
+AUTH_ISSUER="https://issuer.example.com"   # optional
+AUTH_AUDIENCE="golden-gate-gateway"        # optional
+AUTH_REQUIRED_SCOPE="gateway:chat:invoke"  # optional
+```
+
+When `AUTH_ENABLED=true`, `POST /v1/chat/completions` requires
+`Authorization: Bearer <jwt>`. `/health` stays public.
+
+### Team Token Issuance (Internal)
+
+This gateway is intended as a shared backend service. Teams authenticate once with
+**a gateway JWT**, not provider keys.
+
+- Teams do **not** bring `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or `GEMINI_API_KEY`.
+- Gateway operators manage provider keys centrally.
+- Each team/service can be issued one gateway token (and rotated periodically).
+
+Use the internal issuer script:
+
+```bash
+export AUTH_SHARED_SECRET="your-long-secret"
+export AUTH_ISSUER="https://issuer.example.com"      # optional
+export AUTH_AUDIENCE="golden-gate-gateway"           # optional
+
+python scripts/admin/issue_team_token.py \
+  --team-id team-ml \
+  --scope "gateway:chat:invoke" \
+  --expires-in-hours 720
+```
+
+Notes:
+
+- This script is **internal/admin-only** and is not part of the runtime API.
+- Gateway validates tokens statelessly; issued tokens are not stored by default.
+- Teams should store their token in a backend secret manager (not in source code).
+
+### Token Rotation Playbook
+
+- Issue one token per team/service (`sub` claim = team/service id).
+- Use short lifetimes (for example, 7-30 days) and re-issue on schedule.
+- For routine rotation:
+  1. Issue a new token for the same team.
+  2. Team updates secret manager/env var.
+  3. Team deploys and verifies gateway calls.
+  4. Old token expires naturally.
+- For emergency revocation:
+  - Rotate `AUTH_SHARED_SECRET` and re-issue tokens for active teams.
+  - This invalidates all previously issued tokens immediately.
+
 ### Run
 
 ```bash
@@ -110,6 +164,7 @@ curl -X POST http://localhost:8000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -H "X-Provider: openai" \
   -H "X-Model: gpt-4.1" \
+  -H "Authorization: Bearer <gateway_token>" \
   -d '{"messages": [{"role": "user", "content": "Hello"}]}'
 ```
 
@@ -120,6 +175,7 @@ curl -X POST http://localhost:8000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -H "X-Provider: anthropic" \
   -H "X-Model: claude-haiku-4-5" \
+  -H "Authorization: Bearer <gateway_token>" \
   -d '{"messages": [{"role": "user", "content": "Hello"}]}'
 ```
 
@@ -130,6 +186,7 @@ curl -X POST http://localhost:8000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -H "X-Provider: gemini" \
   -H "X-Model: gemini-2.5-flash" \
+  -H "Authorization: Bearer <gateway_token>" \
   -d '{"messages": [{"role": "user", "content": "Hello"}]}'
 ```
 

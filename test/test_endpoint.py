@@ -65,7 +65,11 @@ async def test_anthropic_call(client, mock_anthropic_call):
 @pytest.mark.asyncio
 async def test_gemini_call(client, mock_gemini_call):
     mock_gemini_call.return_value = _gemini_response()
-    resp = client.post("/v1/chat/completions", json=BODY, headers=GEMINI_HEADERS)
+    with patch(
+        "src.models.GeminiProvider.to_provider_format",
+        return_value={"model": "gemini-2.5-flash", "contents": [], "config": None},
+    ):
+        resp = client.post("/v1/chat/completions", json=BODY, headers=GEMINI_HEADERS)
     assert resp.status_code == 200
     assert resp.json()["choices"][0]["message"]["content"] == "hello"
     mock_gemini_call.assert_awaited_once()
@@ -105,7 +109,11 @@ async def test_all_providers_fail(client, mock_openai_call, mock_anthropic_call,
     mock_anthropic_call.side_effect = Exception("fail")
     mock_gemini_call.side_effect = Exception("fail")
 
-    resp = client.post("/v1/chat/completions", json=BODY, headers=OPENAI_HEADERS)
+    with patch(
+        "src.models.GeminiProvider.to_provider_format",
+        return_value={"model": "gemini-2.5-flash", "contents": [], "config": None},
+    ):
+        resp = client.post("/v1/chat/completions", json=BODY, headers=OPENAI_HEADERS)
     assert resp.status_code == 500
     assert "All providers failed" in resp.text
 

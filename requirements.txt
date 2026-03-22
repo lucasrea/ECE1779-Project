@@ -4,6 +4,7 @@ uvicorn
 pydantic
 anyio
 python-dotenv
+PyJWT
 
 # [providers]
 openai

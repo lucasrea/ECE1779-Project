@@ -4,9 +4,10 @@ from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 load_dotenv()
 
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 from prometheus_fastapi_instrumentator import Instrumentator
 
+from src.auth import Principal, require_auth
 from src.models import ChatRequest
 from src.semantic_cache import SemanticCache
 from src.registry import PROVIDER_REGISTRY
@@ -53,7 +54,9 @@ async def chat_completions(
     request: ChatRequest,
     x_provider: str = Header(...),
     x_model: str = Header(...),
+    principal: Principal = Depends(require_auth),
 ):
+    _ = principal
     provider_cls = PROVIDER_REGISTRY.get(x_provider.lower())
     if not provider_cls:
         raise HTTPException(400, f"Unknown provider: {x_provider}")

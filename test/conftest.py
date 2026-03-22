@@ -12,6 +12,16 @@ from src.api import app  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
+def default_auth_disabled(monkeypatch):
+    """Keep auth disabled unless a test opts in."""
+    monkeypatch.setenv("AUTH_ENABLED", "false")
+    monkeypatch.delenv("AUTH_ISSUER", raising=False)
+    monkeypatch.delenv("AUTH_AUDIENCE", raising=False)
+    monkeypatch.delenv("AUTH_REQUIRED_SCOPE", raising=False)
+    monkeypatch.delenv("AUTH_SHARED_SECRET", raising=False)
+
+
+@pytest.fixture(autouse=True)
 def mock_cache():
     """Provide a mock SemanticCache so tests never hit a real database."""
     mock = AsyncMock()

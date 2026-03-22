@@ -4,6 +4,7 @@
 __pycache__/
 *.pyc
 test/
+scripts/
 k8s/
 grafana/
 prometheus_data/
