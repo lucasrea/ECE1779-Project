@@ -8,6 +8,11 @@ from src.registry import PROVIDER_REGISTRY
 from prometheus_fastapi_instrumentator import Instrumentator
 from fastapi import FastAPI, Header, HTTPException
 
+from src.observability.metrics import (
+    record_cache_hit,
+    record_cache_miss
+)
+
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
@@ -56,7 +61,8 @@ async def chat_completions(
     x_provider: str = Header(...),
     x_model: str = Header(...),
 ):
-    provider_cls = PROVIDER_REGISTRY.get(x_provider.lower())
+    provider_name = x_provider.lower()
+    provider_cls = PROVIDER_REGISTRY.get(provider_name)
     if not provider_cls:
         raise HTTPException(400, f"Unknown provider: {x_provider}")
 
@@ -66,7 +72,12 @@ async def chat_completions(
     if cache:
         cached = await cache.lookup(request.messages)
         if cached:
+            response_text = cached.get("choices", [{}])[0].get("message", {}).get("content", "")
+            
+            record_cache_hit(provider_name, x_model, response_text) # record cache hit
             return cached
+        else:
+            record_cache_miss(provider_name, x_model) # record cache miss
 
     payload = provider.to_provider_format(request, model=x_model)
     try:
