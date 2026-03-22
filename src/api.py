@@ -1,16 +1,18 @@
 import logging
+import src.models  # noqa: F401  — triggers @register_provider decorators
+
+from src.models import ChatRequest
+from src.semantic_cache import SemanticCache
+from src.registry import PROVIDER_REGISTRY
+
+from prometheus_fastapi_instrumentator import Instrumentator
+from fastapi import FastAPI, Header, HTTPException
+
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
 load_dotenv()
 
-from fastapi import FastAPI, Header, HTTPException
-from prometheus_fastapi_instrumentator import Instrumentator
-
-from src.models import ChatRequest
-from src.semantic_cache import SemanticCache
-from src.registry import PROVIDER_REGISTRY
-import src.models  # noqa: F401  — triggers @register_provider decorators
 
 logger = logging.getLogger(__name__)
 
