@@ -1,4 +1,5 @@
 import logging
+import time
 import src.models  # noqa: F401  — triggers @register_provider decorators
 
 from src.models import ChatRequest
@@ -10,7 +11,9 @@ from fastapi import FastAPI, Header, HTTPException
 
 from src.observability.metrics import (
     record_cache_hit,
-    record_cache_miss
+    record_cache_miss,
+    record_transform,
+    record_provider_call
 )
 
 from contextlib import asynccontextmanager
@@ -79,7 +82,16 @@ async def chat_completions(
         else:
             record_cache_miss(provider_name, x_model) # record cache miss
 
+    start_time = time.perf_counter()
     payload = provider.to_provider_format(request, model=x_model)
+    end_time = time.perf_counter()
+
+    transform_elapsed = end_time - start_time
+
+    start_time = time.perf_counter()
+    actual_provider = provider_name
+    actual_model = x_model
+
     try:
         raw_response = await provider.call(payload)
         response = provider.normalize(raw_response)
@@ -87,7 +99,17 @@ async def chat_completions(
         logging.exception(
             "Primary provider %s failed, entering fallback chain", x_provider,
         )
+
+        first_call_elapsed = (time.perf_counter()) - start_time # record time taken to failure
+        record_provider_call(actual_provider, actual_model, "failure", first_call_elapsed)
+
         response = await _fallback_chain(request, skip=x_provider.lower())
+    
+    end_time = time.perf_counter()
+    call_elapsed = end_time - start_time
+
+    record_transform(actual_provider, actual_model, transform_elapsed)
+    record_provider_call(actual_provider, actual_model, "success", call_elapsed)
 
     if cache:
         await cache.store(request.messages, response, x_provider.lower(), x_model)
