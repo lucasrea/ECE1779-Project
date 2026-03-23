@@ -49,6 +49,7 @@ parser.add_argument("--rate",     type=float, default=2.0)
 parser.add_argument("--hit-rate", type=float, default=0.3)
 parser.add_argument("--fail-rate",type=float, default=0.1)
 parser.add_argument("--port",     type=int,   default=8000)
+parser.add_argument("--host",     type=str,   default="0.0.0.0")
 parser.add_argument("--help", "-h", action="store_true")
 _args, _ = parser.parse_known_args()
 
@@ -138,11 +139,12 @@ if __name__ == "__main__":
         print("  --hit-rate FLOAT   Fraction that are cache hits  (default: 0.3)")
         print("  --fail-rate FLOAT  Fraction that are failures    (default: 0.1)")
         print("  --port INT         Port to listen on             (default: 8000)")
+        print("  --port STR         Host to listen on             (default: 0.0.0.0)")
         raise SystemExit(0)
 
     uvicorn.run(
         "simulate_traffic:app",
-        host="0.0.0.0",
+        host=_args.host,
         port=_args.port,
         reload=False,
     )
