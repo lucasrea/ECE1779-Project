@@ -236,9 +236,11 @@ Tests mock all provider SDK calls so no API keys are needed to run them.
 Use the traffic simulator to emit fake metrics and verify all Grafana panels without real API keys:
 
 ```bash
-python test/test_observability.py              # 2 req/s, default mix
-python test/test_observability.py --rate 10   # faster
-python test/test_observability.py --fail-rate 0.4 --hit-rate 0.2  # stress error panels
+python simulate_traffic.py              # 2 req/s, default mix
+python simulate_traffic.py --rate 10   # faster
+python simulate_traffic.py --fail-rate 0.4 --hit-rate 0.2  # stress error panels
 ```
-
 Make sure `docker compose up -d` is running first so Prometheus scrapes the simulator's `/metrics` endpoint. By default, `prometheus_data/prometheus.yml` is configured to scrape `host.docker.internal:8000`, so either run the simulator on port 8000 or update the Prometheus scrape config to match any custom `--port` you choose.
+
+## Video Demo
+**https://youtu.be/wSiC2EXkwCo**

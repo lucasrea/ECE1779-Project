@@ -1,6 +1,8 @@
 import logging
 import os
 
+from typing import Literal
+
 from pydantic import BaseModel
 import anyio
 
@@ -35,6 +37,15 @@ class BaseProvider:
     def normalize(self, response: object) -> dict:
         raise NotImplementedError
 
+# ---------------------------------------------------------------------------
+# Fallback response wrapper
+# ---------------------------------------------------------------------------
+
+class FallbackResponse(BaseModel):
+    provider: Literal["openai", "anthropic", "gemini"] # actual provider called
+    model: str # actual model called
+    transform_time: float # actual time taken for transformation
+    response: dict
 
 # ---------------------------------------------------------------------------
 # Provider API keys
