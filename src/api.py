@@ -1,4 +1,6 @@
+import json
 import logging
+import time
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
@@ -10,6 +12,14 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from src.models import ChatRequest
 from src.semantic_cache import SemanticCache
 from src.registry import PROVIDER_REGISTRY
+from src.observability.metrics import (
+    record_cache_hit,
+    record_cache_miss,
+    record_provider_call,
+    record_transform,
+    start_price_refresh_loop,
+    stop_price_refresh_loop,
+)
 import src.models  # noqa: F401  — triggers @register_provider decorators
 
 logger = logging.getLogger(__name__)
@@ -33,7 +43,9 @@ async def lifespan(app: FastAPI):
             exc_info=True,
         )
         app.state.cache = None
+    await start_price_refresh_loop()
     yield
+    await stop_price_refresh_loop()
     cache = getattr(app.state, "cache", None)
     if cache:
         await cache.close()
@@ -64,13 +76,22 @@ async def chat_completions(
     if cache:
         cached = await cache.lookup(request.messages)
         if cached:
+            record_cache_hit(x_provider.lower(), x_model, json.dumps(cached))
             return cached
+        else:
+            record_cache_miss(x_provider.lower(), x_model)
 
+    t0 = time.perf_counter()
     payload = provider.to_provider_format(request, model=x_model)
+    record_transform(x_provider.lower(), x_model, time.perf_counter() - t0)
+
+    t1 = time.perf_counter()
     try:
         raw_response = await provider.call(payload)
         response = provider.normalize(raw_response)
+        record_provider_call(x_provider.lower(), x_model, "success", time.perf_counter() - t1)
     except Exception:
+        record_provider_call(x_provider.lower(), x_model, "failure", time.perf_counter() - t1)
         logging.exception(
             "Primary provider %s failed, entering fallback chain", x_provider,
         )
