@@ -1,4 +1,3 @@
-import json
 import logging
 import time
 import src.models  # noqa: F401  — triggers @register_provider decorators
@@ -93,7 +92,12 @@ async def chat_completions(
     if cache:
         cached = await cache.lookup(request.messages)
         if cached:
-            record_cache_hit(x_provider.lower(), x_model, json.dumps(cached))
+            response_text = (
+                cached.get("choices", [{}])[0]
+                .get("message", {})
+                .get("content", "")
+            )
+            record_cache_hit(x_provider.lower(), x_model, response_text)
             return cached
         else:
             record_cache_miss(x_provider.lower(), x_model)
