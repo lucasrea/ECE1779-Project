@@ -85,6 +85,29 @@ DATABASE_URL="postgresql://user:pass@localhost:5432/pgvector"
 docker compose up -d
 ```
 
+| Service    | URL                   | Credentials(username/password)   |
+|------------|-----------------------|---------------|
+| Grafana    | http://localhost:3000 | admin/admin |
+| Prometheus | http://localhost:9090 | —             |
+
+The **Golden Gate Gateway - Metrics** dashboard is provisioned automatically — no manual import needed. Open Grafana and it will be available under **Dashboards**.
+
+To verify Prometheus is scraping the app, visit `http://localhost:9090/targets` — the `golden-gate-gateway` job should show **State: UP**.
+
+### Configure
+
+Create a `.env` file in the project root with your provider API keys:
+
+```
+OPENAI_API_KEY="sk-..."
+ANTHROPIC_API_KEY="sk-ant-..."
+GEMINI_API_KEY="..."
+API_KEY_PEPPER="set-a-long-random-string"
+```
+
+The server loads `.env` automatically on startup via `python-dotenv`.
+
+### Run
 4. Run app:
 
 ```bash
@@ -250,11 +273,12 @@ Monitor:
 - Member 3: Kubernetes manifests (`k8s/*`), orchestration, testing scripts.
 - Member 4: observability (`prometheus_data/*`, Grafana dashboard).
 
+Align contributions to commit history using `git log --author=<name>`.
+
 ## 11. Lessons Learned and Concluding Remarks
 
 - Learned how to unify heterogeneous LLM providers under one API, increase fault tolerance, and apply semantics-based caching.
 - Gained practical experience with Kubernetes deployment lifecycle and observability pipelines.
 - Reinforced discipline in verifying AI-generated recommendations through tests and code reviews.
 - The project demonstrates a real-world architecture for cloud-native LLM services and provides a robust foundation for future extensions (API keys rotation, RBAC,  usage quotas, multi-region failover).
-
 ---
