@@ -45,6 +45,7 @@ Create a `.env` file in the project root with your provider API keys:
 OPENAI_API_KEY="sk-..."
 ANTHROPIC_API_KEY="sk-ant-..."
 GEMINI_API_KEY="..."
+API_KEY_PEPPER="set-a-long-random-string"
 ```
 
 The server loads `.env` automatically on startup via `python-dotenv`.
@@ -80,7 +81,7 @@ Before applying the manifests:
 
 1. Build and push the gateway image to the shared DigitalOcean Container Registry.
 2. Update the image tag in `k8s/gateway.yaml` so it points to the exact image you pushed.
-3. Replace the placeholder values in `k8s/config.yaml` locally, especially the provider API keys and `GRAFANA_ADMIN_PASSWORD`.
+3. Replace the placeholder values in `k8s/config.yaml` locally, especially the provider API keys, `API_KEY_PEPPER`, and `GRAFANA_ADMIN_PASSWORD`.
 4. Do not commit real secrets.
 5. Make sure your DOKS cluster is authorized to pull from the `golden-gate` registry.
 
@@ -112,6 +113,7 @@ In Kubernetes, Prometheus scrapes the gateway at `gateway:80/metrics`, and Grafa
 
 | Header       | Required | Description                                      |
 |--------------|----------|--------------------------------------------------|
+| `Authorization` | Yes   | Bearer API key issued by gateway operators       |
 | `X-Provider` | Yes      | Provider to route to: `openai`, `anthropic`, `gemini` |
 | `X-Model`    | Yes      | Model name passed to the provider SDK            |
 
@@ -154,6 +156,7 @@ In Kubernetes, Prometheus scrapes the gateway at `gateway:80/metrics`, and Grafa
 ```bash
 curl -X POST http://localhost:8000/v1/chat/completions \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer gg_live_<prefix>_<secret>" \
   -H "X-Provider: openai" \
   -H "X-Model: gpt-4.1" \
   -d '{"messages": [{"role": "user", "content": "Hello"}]}'
@@ -164,6 +167,7 @@ curl -X POST http://localhost:8000/v1/chat/completions \
 ```bash
 curl -X POST http://localhost:8000/v1/chat/completions \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer gg_live_<prefix>_<secret>" \
   -H "X-Provider: anthropic" \
   -H "X-Model: claude-haiku-4-5" \
   -d '{"messages": [{"role": "user", "content": "Hello"}]}'
@@ -174,10 +178,101 @@ curl -X POST http://localhost:8000/v1/chat/completions \
 ```bash
 curl -X POST http://localhost:8000/v1/chat/completions \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer gg_live_<prefix>_<secret>" \
   -H "X-Provider: gemini" \
   -H "X-Model: gemini-2.5-flash" \
   -d '{"messages": [{"role": "user", "content": "Hello"}]}'
 ```
+
+## API Key Management
+
+Gateway client auth is managed with persistent bearer keys stored as hashes in Postgres (`api_keys` table).
+
+Use the admin script:
+
+```bash
+python scripts/manage_api_keys.py create --owner "team-a"
+python scripts/manage_api_keys.py list
+python scripts/manage_api_keys.py revoke --prefix <key-prefix>
+```
+
+The `create` command prints the plaintext key once in the format `gg_live_<prefix>_<secret>`.
+
+`API_KEY_PEPPER` is mixed into key hashing. Keep it private and consistent between key creation and request validation. If you change it, previously created keys will no longer validate.
+
+### Local key management
+
+With docker-compose Postgres:
+
+```bash
+DATABASE_URL=postgresql://postgres:password@localhost:5432/gateway \
+python scripts/manage_api_keys.py create --owner "local-tester"
+```
+
+### End-to-end local auth test
+
+1. Start services and rebuild to ensure env changes are loaded:
+
+```bash
+docker compose up -d --build
+```
+
+2. Confirm `.env` includes your provider key(s) and `API_KEY_PEPPER`.
+
+3. Create a gateway API key:
+
+```bash
+source .venv/bin/activate
+DATABASE_URL=postgresql://postgres:password@localhost:5432/gateway \
+python scripts/manage_api_keys.py create --owner "local-tester"
+```
+
+4. Call the gateway with the printed bearer key:
+
+```bash
+curl -X POST http://localhost:8000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer gg_live_<prefix>_<secret>" \
+  -H "X-Provider: anthropic" \
+  -H "X-Model: claude-haiku-4-5" \
+  -d '{"messages": [{"role": "user", "content": "Hello"}]}'
+```
+
+5. Negative checks:
+   - remove `Authorization` header -> expect `401`
+   - use an invalid key -> expect `401`
+
+6. Revoke and verify:
+
+```bash
+python scripts/manage_api_keys.py revoke --prefix <key-prefix>
+```
+
+Retry the same request with that key and confirm it returns `401`.
+
+### Kubernetes production key management
+
+Option 1 (from your machine) via port-forward:
+
+```bash
+kubectl -n golden-gate port-forward svc/postgres 15432:5432
+DATABASE_URL=postgresql://postgres:<POSTGRES_PASSWORD>@localhost:15432/gateway \
+python scripts/manage_api_keys.py create --owner "evaluator-1"
+```
+
+Option 2 (inside cluster): run the same script in a one-off pod/job with the same `gateway-secrets`/`gateway-config` env injection pattern as the gateway deployment.
+
+### Docker credential helper troubleshooting
+
+If `docker compose up -d --build` fails with:
+
+`error getting credentials ... "docker-credential-desktop": executable file not found in $PATH`
+
+your Docker client is configured with a credential helper that is not available in the current shell. Fix by either:
+
+- starting Docker Desktop and retrying, or
+- adjusting `~/.docker/config.json` to use an installed helper (for example `osxkeychain`), or
+- removing the `credsStore` entry temporarily.
 
 ### Fallback behaviour
 
