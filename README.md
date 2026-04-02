@@ -76,6 +76,7 @@ pip install -r requirements.txt
 OPENAI_API_KEY="sk-..."
 ANTHROPIC_API_KEY="sk-ant-..."
 GEMINI_API_KEY="..."
+API_KEY_PEPPER="set-a-long-random-string"
 DATABASE_URL="postgresql://user:pass@localhost:5432/pgvector"
 ```
 
