@@ -20,6 +20,11 @@ if [[ -z "${OPENAI_API_KEY:-}" || -z "${ANTHROPIC_API_KEY:-}" || -z "${GEMINI_AP
   exit 1
 fi
 
+if [[ -z "${API_KEY_PEPPER:-}" ]]; then
+  echo "Missing API_KEY_PEPPER in .env"
+  exit 1
+fi
+
 GRAFANA_ADMIN_PASSWORD="$1"
 POSTGRES_PASSWORD="${2:-${POSTGRES_PASSWORD:-}}"
 
@@ -33,6 +38,7 @@ kubectl create secret generic gateway-secrets -n golden-gate \
   --from-literal=OPENAI_API_KEY="${OPENAI_API_KEY}" \
   --from-literal=ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY}" \
   --from-literal=GEMINI_API_KEY="${GEMINI_API_KEY}" \
+  --from-literal=API_KEY_PEPPER="${API_KEY_PEPPER}" \
   --from-literal=POSTGRES_PASSWORD="${POSTGRES_PASSWORD}" \
   --from-literal=GRAFANA_ADMIN_PASSWORD="${GRAFANA_ADMIN_PASSWORD}" \
   --dry-run=client -o yaml | kubectl apply -f -
