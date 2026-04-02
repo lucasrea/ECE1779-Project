@@ -103,9 +103,9 @@ uvicorn src.api:app --reload
 
 Headers:
 - `Content-Type: application/json`
+- `Authorization: Bearer gg_live_<prefix>_<secret>`
 - `X-Provider: openai|anthropic|gemini`
 - `X-Model: model-name`
-
 Body (OpenAI format):
 
 ```json
@@ -124,6 +124,7 @@ Example:
 ```bash
 curl -X POST http://localhost:8000/v1/chat/completions \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer gg_live_<prefix>_<secret>" \
   -H "X-Provider: openai" \
   -H "X-Model: gpt-4.1" \
   -d '{"messages":[{"role":"user","content":"Hello"}]}'
@@ -143,6 +144,13 @@ Fallback behavior:
 
 - `docs/screenshots/api-request.png`
 - `docs/screenshots/grafana-dashboard.png`
+
+### 6.5 API key lifecycle (admin)
+
+- Create key: `python scripts/manage_api_keys.py create --owner "team-a"`
+- List keys: `python scripts/manage_api_keys.py list`
+- Revoke key: `python scripts/manage_api_keys.py revoke --prefix <key-prefix>`
+- Note: changing `API_KEY_PEPPER` invalidates previously issued keys.
 
 ## 7. Development Guide
 
