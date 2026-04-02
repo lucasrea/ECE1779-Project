@@ -1,26 +1,25 @@
 import logging
 import time
-import src.models  # noqa: F401  — triggers @register_provider decorators
-
-from src.models import ChatRequest, FallbackResponse
-from src.semantic_cache import SemanticCache
-from src.registry import PROVIDER_REGISTRY
-
-from prometheus_fastapi_instrumentator import Instrumentator
-from fastapi import FastAPI, Header, HTTPException
-
-from src.observability.metrics import (
-    record_cache_hit,
-    record_cache_miss,
-    record_transform,
-    record_provider_call
-)
-
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
 load_dotenv()
 
+from fastapi import FastAPI, Header, HTTPException
+from prometheus_fastapi_instrumentator import Instrumentator
+
+from src.models import ChatRequest, FallbackResponse
+from src.semantic_cache import SemanticCache
+from src.registry import PROVIDER_REGISTRY
+from src.observability.metrics import (
+    record_cache_hit,
+    record_cache_miss,
+    record_provider_call,
+    record_transform,
+    start_price_refresh_loop,
+    stop_price_refresh_loop,
+)
+import src.models  # noqa: F401  — triggers @register_provider decorators
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +29,7 @@ DEFAULT_MODELS = {
     "anthropic": "claude-haiku-4-5",
     "gemini": "gemini-2.5-flash",
 }
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -43,10 +43,13 @@ async def lifespan(app: FastAPI):
             exc_info=True,
         )
         app.state.cache = None
+    await start_price_refresh_loop()
     yield
+    await stop_price_refresh_loop()
     cache = getattr(app.state, "cache", None)
     if cache:
         await cache.close()
+
 
 app = FastAPI(title="Golden Gate Gateway", lifespan=lifespan)
 
@@ -76,18 +79,15 @@ async def chat_completions(
         cached = await cache.lookup(request.messages)
         if cached:
             response_text = cached.get("choices", [{}])[0].get("message", {}).get("content", "")
-            record_cache_hit(provider_name, x_model, response_text) # record cache hit
+            record_cache_hit(provider_name, x_model, response_text)
             return cached
-        else:
-            record_cache_miss(provider_name, x_model) # record cache miss
+        record_cache_miss(provider_name, x_model)
 
-    start_time = time.perf_counter()
+    transform_start = time.perf_counter()
     payload = provider.to_provider_format(request, model=x_model)
-    end_time = time.perf_counter()
+    transform_elapsed = time.perf_counter() - transform_start
 
-    transform_elapsed = end_time - start_time
-
-    start_time = time.perf_counter()
+    call_start = time.perf_counter()
     actual_provider = provider_name
     actual_model = x_model
 
@@ -98,59 +98,62 @@ async def chat_completions(
         logging.exception(
             "Primary provider %s failed, entering fallback chain", x_provider,
         )
+        record_provider_call(actual_provider, actual_model, "failure", time.perf_counter() - call_start)
 
-        first_call_elapsed = (time.perf_counter()) - start_time # record time taken to failure
-        record_provider_call(actual_provider, actual_model, "failure", first_call_elapsed)
+        fallback_response = await _fallback_chain(
+            request,
+            skip=provider_name,
+            fallback_start_time=call_start,
+        )
 
-        fallback_response = await _fallback_chain(request, skip=x_provider.lower(), fallback_start_time=start_time)
-
-        # extract result from fallback responser wrapper, overwrite previous metrics
         actual_provider = fallback_response.provider
         actual_model = fallback_response.model
         transform_elapsed = fallback_response.transform_time
         response = fallback_response.response
-
-    
-    end_time = time.perf_counter()
-    call_elapsed = end_time - start_time
-
-    record_transform(actual_provider, actual_model, transform_elapsed)
-    record_provider_call(actual_provider, actual_model, "success", call_elapsed)
+    else:
+        record_transform(actual_provider, actual_model, transform_elapsed)
+        record_provider_call(actual_provider, actual_model, "success", time.perf_counter() - call_start)
 
     if cache:
-        await cache.store(request.messages, response, x_provider.lower(), x_model)
+        await cache.store(request.messages, response, provider_name, x_model)
 
     return response
 
 
-async def _fallback_chain(request: ChatRequest, skip: str, fallback_start_time: float) -> FallbackResponse:
+async def _fallback_chain(
+    request: ChatRequest,
+    skip: str,
+    fallback_start_time: float,
+) -> FallbackResponse:
     for name in FALLBACK_ORDER:
         if name == skip:
             continue
+
         provider_cls = PROVIDER_REGISTRY.get(name)
         if not provider_cls:
             continue
+
         provider = provider_cls()
 
-        t_start = time.perf_counter()
+        transform_start = time.perf_counter()
         payload = provider.to_provider_format(request, model=DEFAULT_MODELS[name])
-        t_end = time.perf_counter()
+        transform_elapsed = time.perf_counter() - transform_start
 
-        transform_elapsed = t_end - t_start
-
+        call_start = time.perf_counter()
         try:
             raw = await provider.call(payload)
+            response = provider.normalize(raw)
+            record_transform(name, DEFAULT_MODELS[name], transform_elapsed)
+            record_provider_call(name, DEFAULT_MODELS[name], "success", time.perf_counter() - call_start)
             return FallbackResponse(
-                provider=name, 
-                model=DEFAULT_MODELS[name], 
-                transform_time=transform_elapsed, 
-                response=provider.normalize(raw)
+                provider=name,
+                model=DEFAULT_MODELS[name],
+                transform_time=transform_elapsed,
+                response=response,
             )
         except Exception:
             logging.exception("Fallback provider %s failed", name)
-
-            current_try_elapsed = (time.perf_counter()) - fallback_start_time  # record time taken to failure
-            record_provider_call(name, DEFAULT_MODELS[name], "failure", current_try_elapsed)
-
+            record_provider_call(name, DEFAULT_MODELS[name], "failure", time.perf_counter() - fallback_start_time)
             continue
+
     raise HTTPException(500, "All providers failed")
