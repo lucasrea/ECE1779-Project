@@ -1,246 +1,254 @@
-# Golden Gate Gateway
+# Final Project Report: Golden Gate Gateway
 
-A unified, high-availability LLM gateway that exposes a single OpenAI-compatible API surface for multiple providers (OpenAI, Anthropic, Google Gemini). Switch providers by changing a header — no code changes required.
+## 1. Team Information
 
-## Quickstart
+- Member 1: Yingxuan Hu, 1006881377
+- Member 2: Jignwen Xu, 1011282675
+- Member 3: King Wang, 1008235081
+- Member 4: Lucas Rea, 1003099531
 
-### Prerequisites
+## 2. Motivation
+
+Modern AI applications often depend on one cloud provider's API, creating risk from outages, rate limits, or pricing changes. 
+Golden Gate Gateway addresses this by providing a single OpenAI-compatible endpoint that routes requests transparently to OpenAI, Anthropic, or Google Gemini, with provider-switching via header and automatic fallback.
+
+This project is significant because it demonstrates resilience, portability, and monitored observability for production-grade model serving.
+
+## 3. Objectives
+
+1. Build a provider-agnostic LLM gateway with normalized OpenAI-style interface.
+2. Support OpenAI, Anthropic, and Google Gemini via common endpoint.
+3. Implement provider failover: primary provider → remaining providers.
+4. Add semantic caching (pgvector) to reduce repeated inference costs.
+5. Provide observability with Prometheus + Grafana and confirm metrics reliability.
+6. Deploy using Kubernetes (DOKS manifests provided) for real cluster operation.
+
+## 4. Technical Stack
 
 - Python 3.10
-- [uv](https://docs.astral.sh/uv/) (recommended) or pip
-- API keys for at least one provider
+- FastAPI (HTTP gateway)
+- Pydantic (schemas/validation)
+- PostgreSQL (+ pgvector extension) for semantic cache
+- `uvicorn` as ASGI server
+- Docker Compose for local observability stack
+- Kubernetes (DigitalOcean Kubernetes Service) for production orchestration
+- Prometheus + Grafana for metrics
+- Pytest for automated tests
+- `simulate_traffic.py` for load & metric simulation
 
-### Setup
+Deployment approach: Kubernetes (manifests under `k8s/`, including `gateway.yaml`, `postgres.yaml`, `monitoring.yaml`).
 
-1. Application:
+## 5. Features
+
+- Single REST entrypoint: `POST /v1/chat/completions`
+- Provider selection: `X-Provider` header (`openai`, `anthropic`, `gemini`)
+- Model selection: `X-Model` header
+- Provider template translation: request/response mapping per vendor
+- Fallback chain: if chosen provider fails, try other providers automatically
+- Semantic cache lookup/store with pgvector cosine similarity
+- Observability metrics: request counts, latencies, provider errors, cache hits/misses, fallback events
+- DB-backed cache for repeated prompt efficiency
+- Test coverage with provider call mocking
+
+
+## 6. User Guide
+
+### 6.1 Local Setup
+
+Prerequisites:
+- Python 3.10
+- Docker (for monitoring stack)
+- `doctl` + `kubectl` (for Kubernetes deployment)
+
+Steps:
+
+1. Install dependencies:
 
 ```bash
-uv venv --python 3.10
+python -m venv .venv
 source .venv/bin/activate
-uv pip install -r requirements.txt
+pip install -r requirements.txt
 ```
 
-2. Observability (Prometheus + Grafana):
+2. Set environment variables in `.env`:
 
-Requires [Docker](https://docs.docker.com/get-docker/). From the project root:
+```env
+OPENAI_API_KEY="sk-..."
+ANTHROPIC_API_KEY="sk-ant-..."
+GEMINI_API_KEY="..."
+DATABASE_URL="postgresql://user:pass@localhost:5432/pgvector"
+```
+
+3. Start observability:
 
 ```bash
 docker compose up -d
 ```
 
-| Service    | URL                   | Credentials(username/password)   |
-|------------|-----------------------|---------------|
-| Grafana    | http://localhost:3000 | admin/admin |
-| Prometheus | http://localhost:9090 | —             |
-
-The **Golden Gate Gateway - Metrics** dashboard is provisioned automatically — no manual import needed. Open Grafana and it will be available under **Dashboards**.
-
-To verify Prometheus is scraping the app, visit `http://localhost:9090/targets` — the `golden-gate-gateway` job should show **State: UP**.
-
-### Configure
-
-Create a `.env` file in the project root with your provider API keys:
-
-```
-OPENAI_API_KEY="sk-..."
-ANTHROPIC_API_KEY="sk-ant-..."
-GEMINI_API_KEY="..."
-```
-
-The server loads `.env` automatically on startup via `python-dotenv`.
-
-### Run
+4. Run app:
 
 ```bash
-source .venv/bin/activate
 uvicorn src.api:app --reload
 ```
 
-The server starts at `http://localhost:8000`.
+5. Verify app:
 
-## Kubernetes Deployment
+- `http://localhost:8000/docs` (Swagger UI)
+- `http://localhost:9090/targets` (Prometheus)
+- `http://localhost:3000` (Grafana, admin/admin)
 
-This repo includes a DigitalOcean Kubernetes deployment path in `k8s/`.
+### 6.2 API usage
 
-Prerequisites:
+#### POST /v1/chat/completions
 
-- Access to the shared DigitalOcean team and DOKS cluster
-- `doctl` installed
-- `kubectl` installed
+Headers:
+- `Content-Type: application/json`
+- `X-Provider: openai|anthropic|gemini`
+- `X-Model: model-name`
 
-Authenticate and connect to the cluster:
-
-```bash
-doctl auth init
-doctl kubernetes cluster kubeconfig save <cluster-name>
-kubectl get nodes
-```
-
-Before applying the manifests:
-
-1. Build and push the gateway image to the shared DigitalOcean Container Registry.
-2. Update the image tag in `k8s/gateway.yaml` so it points to the exact image you pushed.
-3. Replace the placeholder values in `k8s/config.yaml` locally, especially the provider API keys and `GRAFANA_ADMIN_PASSWORD`.
-4. Do not commit real secrets.
-5. Make sure your DOKS cluster is authorized to pull from the `golden-gate` registry.
-
-Apply the manifests in this order:
-
-```bash
-kubectl apply -f k8s/config.yaml
-kubectl apply -f k8s/postgres.yaml
-kubectl apply -f k8s/gateway.yaml
-kubectl apply -f k8s/monitoring.yaml
-```
-
-Useful checks:
-
-```bash
-kubectl get pods -n golden-gate
-kubectl get svc -n golden-gate
-kubectl port-forward -n golden-gate svc/prometheus 9090:9090
-kubectl port-forward -n golden-gate svc/grafana 3000:3000
-```
-
-In Kubernetes, Prometheus scrapes the gateway at `gateway:80/metrics`, and Grafana loads the provisioned dashboard automatically.
-
-## API Reference
-
-### `POST /v1/chat/completions`
-
-**Headers**
-
-| Header       | Required | Description                                      |
-|--------------|----------|--------------------------------------------------|
-| `X-Provider` | Yes      | Provider to route to: `openai`, `anthropic`, `gemini` |
-| `X-Model`    | Yes      | Model name passed to the provider SDK            |
-
-**Request body** (OpenAI-compatible)
+Body (OpenAI format):
 
 ```json
 {
   "messages": [
-    {"role": "system", "content": "You are a helpful assistant"},
-    {"role": "user", "content": "Explain quantum computing"}
+    {"role": "system", "content": "You are a helpful assistant."},
+    {"role": "user", "content": "Tell me a haiku."}
   ],
   "temperature": 0.7,
-  "max_tokens": 1024
+  "max_tokens": 100
 }
 ```
 
-**Response**
-
-```json
-{
-  "choices": [
-    {
-      "message": {
-        "role": "assistant",
-        "content": "Quantum computing uses..."
-      }
-    }
-  ],
-  "usage": {
-    "prompt_tokens": 15,
-    "completion_tokens": 42
-  }
-}
-```
-
-### Sample requests
-
-**OpenAI**
+Example:
 
 ```bash
 curl -X POST http://localhost:8000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -H "X-Provider: openai" \
   -H "X-Model: gpt-4.1" \
-  -d '{"messages": [{"role": "user", "content": "Hello"}]}'
+  -d '{"messages":[{"role":"user","content":"Hello"}]}'
 ```
 
-**Anthropic**
+Fallback behavior:
+- If provider returns non-2xx / error, gateway retries next provider order: openai → anthropic → gemini.
+- Final error returns HTTP 500 with diagnostics.
+
+### 6.3 Semantic cache
+
+- Cache key generated from request text embedding.
+- Cache hit returns stored provider response quickly (avoids external API call).
+- Configure `PGVECTOR_THRESHOLD` etc in env.
+
+### 6.4 Screenshots
+
+- `docs/screenshots/api-request.png`
+- `docs/screenshots/grafana-dashboard.png`
+
+## 7. Development Guide
+
+### 7.1 Repo and workflow
 
 ```bash
-curl -X POST http://localhost:8000/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -H "X-Provider: anthropic" \
-  -H "X-Model: claude-haiku-4-5" \
-  -d '{"messages": [{"role": "user", "content": "Hello"}]}'
+git clone https://github.com/lucasrea/ECE1779-Project.git
+cd ECE1779-Project
 ```
 
-**Google Gemini**
+### 7.2 Database and local storage
+
+- PostgreSQL with `pgvector` extension required for semantic cache.
+- `k8s/postgres.yaml` provision uses `PersistentVolumeClaim` for data.
+- Local test mode can use an in-memory sqlite fallback if `DATABASE_URL` points to sqlite.
+
+Create DB and extension:
+
+```sql
+CREATE DATABASE gateway;
+\c gateway;
+CREATE EXTENSION IF NOT EXISTS vector;
+```
+
+### 7.3 Tests
+
+- Unit tests:
+  - `pytest -q` (mocks provider SDK)
+- Integration tests:
+  - `pytest tests/integration` (if available)
+- Linting:
+  - `ruff check .`
+
+### 7.4 Observability tests
+
+1. Start services (`docker compose up -d`)
+2. Run traffic simulator:
 
 ```bash
-curl -X POST http://localhost:8000/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -H "X-Provider: gemini" \
-  -H "X-Model: gemini-2.5-flash" \
-  -d '{"messages": [{"role": "user", "content": "Hello"}]}'
+python simulate_traffic.py --rate 5 --duration 120
 ```
 
-### Fallback behaviour
+3. Validate in Grafana dashboard and ensure causally visible metrics.
 
-If the primary provider fails, the gateway automatically tries the remaining providers in order: OpenAI, Anthropic, Gemini (skipping the one that already failed). If all providers fail, a `500` is returned.
+## 8. Deployment Information
 
-## Architecture
+### 8.1 Live URL
+#### TO BE REPLACED
+- Application URL: `https://golden-gate-gateway.example.com` 
+- Grafana URL: `https://grafana.example.com`
 
-```
-Client
-  │
-  │  POST /v1/chat/completions
-  │  Headers: X-Provider, X-Model
-  │  Body: { messages, temperature, max_tokens }
-  │
-  ▼
-┌──────────────────────────────────┐
-│  FastAPI Gateway (src/api.py)    │
-│                                  │
-│  1. Resolve provider class from  │
-│     PROVIDER_REGISTRY            │
-│  2. Semantic cache lookup        │
-│  3. to_provider_format()         │
-│  4. provider.call()              │
-│  5. normalize() → OpenAI shape   │
-│  6. Cache store                  │
-└──────────────────────────────────┘
-         │           │           │
-         ▼           ▼           ▼
-      OpenAI    Anthropic     Gemini
-```
-
-### Key files
-
-| File | Purpose |
-|------|---------|
-| `src/api.py` | FastAPI app, routing, fallback chain |
-| `src/models.py` | Pydantic schemas, provider classes (transform + call + normalize) |
-| `src/registry.py` | Self-registering provider registry via `@register_provider` decorator |
-| `src/semantic_cache.py` | pgvector-backed semantic cache |
-
-## Tests
-
-### Unit tests
+### 8.2 Kubernetes instructions
 
 ```bash
-source .venv/bin/activate
-make test
-# or
-python -m pytest -q
+doctl auth init
+doctl kubernetes cluster kubeconfig save <cluster-name>
+kubectl config current-context
+kubectl apply -f k8s/config.yaml
+kubectl apply -f k8s/postgres.yaml
+kubectl apply -f k8s/gateway.yaml
+kubectl apply -f k8s/monitoring.yaml
 ```
 
-Tests mock all provider SDK calls so no API keys are needed to run them.
+Monitor:
 
-### Metrics / Grafana
+- `kubectl get pods -n golden-gate`
+- `kubectl get svc -n golden-gate`
 
-Use the traffic simulator to emit fake metrics and verify all Grafana panels without real API keys:
+## 9. Video Demo
 
-```bash
-python simulate_traffic.py              # 2 req/s, default mix
-python simulate_traffic.py --rate 10   # faster
-python simulate_traffic.py --fail-rate 0.4 --hit-rate 0.2  # stress error panels
-```
-Make sure `docker compose up -d` is running first so Prometheus scrapes the simulator's `/metrics` endpoint. By default, `prometheus_data/prometheus.yml` is configured to scrape `host.docker.internal:8000`, so either run the simulator on port 8000 or update the Prometheus scrape config to match any custom `--port` you choose.
+- Video URL: `https://youtu.be/wSiC2EXkwCo`
 
-## Video Demo
-**https://youtu.be/wSiC2EXkwCo**
+## 10. AI Assistance & Verification (Summary)
+
+- AI contributions:
+  - Architecture exploration (API design, fallback flow, semantic cache)
+  - Containerization and Kubernetes manifest creation guidance
+  - Code scaffolding and debugging suggestions for provider adapters
+  - README and documentation wording
+
+- Representative AI limitation:
+  - AI initially generated an incorrect Kubernetes Service type (ClusterIP instead of LoadBalancer), captured in `ai_session.md`.
+  - Another issue: Mistakenly suggested sending plain API keys in repository files; we corrected by using env variables and secrets.
+
+- Verification approach:
+  - Automated tests (`pytest`) validate request/response and fallback logic with mocks.
+  - Manual cURL and Postman calls confirmed provider routing and normalization.
+  - Prometheus metrics checks (`/targets`, query metrics) and Grafana dashboards confirm observability.
+  - `simulate_traffic.py` load tests validate behaviors and error-handling.
+
+> See `ai_session.md` for detailed AI dialogue excerpts and explicit issue tracing.
+
+## 10. Individual Contributions
+
+- Member 1: API gateway core logic (`src/api.py`), provider registry (`src/registry.py`), fallback engine.
+- Member 2: Semantic cache implementation (`src/semantic_cache.py`), PostgreSQL pgvector integration, local setup docs.
+- Member 3: Kubernetes manifests (`k8s/*`), orchestration, testing scripts.
+- Member 4: observability (`prometheus_data/*`, Grafana dashboard)
+
+Align contributions to commit history using `git log --author=<name>`.
+
+## 11. Lessons Learned and Concluding Remarks
+
+- Learned how to unify heterogeneous LLM providers under one API, increase fault tolerance, and apply semantics-based caching.
+- Gained practical experience with Kubernetes deployment lifecycle and observability pipelines.
+- Reinforced discipline in verifying AI-generated recommendations through tests and code reviews.
+- The project demonstrates a real-world architecture for cloud-native LLM services and provides a robust foundation for future extensions (API keys rotation, RBAC,  usage quotas, multi-region failover).
+
+---
