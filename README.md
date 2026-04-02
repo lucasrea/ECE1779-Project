@@ -240,9 +240,7 @@ Monitor:
 - Member 1: API gateway core logic (`src/api.py`), provider registry (`src/registry.py`), fallback engine.
 - Member 2: Semantic cache implementation (`src/semantic_cache.py`), PostgreSQL pgvector integration, local setup docs.
 - Member 3: Kubernetes manifests (`k8s/*`), orchestration, testing scripts.
-- Member 4: observability (`prometheus_data/*`, Grafana dashboard)
-
-Align contributions to commit history using `git log --author=<name>`.
+- Member 4: observability (`prometheus_data/*`, Grafana dashboard).
 
 ## 11. Lessons Learned and Concluding Remarks
 
