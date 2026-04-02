@@ -21,8 +21,12 @@ if [[ -z "${OPENAI_API_KEY:-}" || -z "${ANTHROPIC_API_KEY:-}" || -z "${GEMINI_AP
 fi
 
 GRAFANA_ADMIN_PASSWORD="$1"
-POSTGRES_PASSWORD="${2:-password}"
+POSTGRES_PASSWORD="${2:-${POSTGRES_PASSWORD:-}}"
 
+if [[ -z "${POSTGRES_PASSWORD}" ]]; then
+  echo "Missing POSTGRES_PASSWORD: provide it as the second argument or set POSTGRES_PASSWORD in .env"
+  exit 1
+fi
 kubectl create namespace golden-gate --dry-run=client -o yaml | kubectl apply -f -
 
 kubectl create secret generic gateway-secrets -n golden-gate \
