@@ -130,8 +130,14 @@ Headers:
 - `Authorization: Bearer gg_live_<prefix>_<secret>`
 - `X-Provider: openai|anthropic|gemini`
 - `X-Model: model-name`
+<<<<<<< HEAD
 Body (OpenAI format):
 
+=======
+
+Body (OpenAI format):
+
+>>>>>>> 13e5a95fb3259eadcaed3aa4046d050ad92e8c5b
 ```json
 {
   "messages": [
@@ -274,6 +280,7 @@ Monitor:
 - Member 3: Kubernetes manifests (`k8s/*`), orchestration, testing scripts.
 - Member 4: observability (`prometheus_data/*`, Grafana dashboard).
 
+<<<<<<< HEAD
 Align contributions to commit history using `git log --author=<name>`.
 
 ## 11. Lessons Learned and Concluding Remarks
@@ -282,4 +289,13 @@ Align contributions to commit history using `git log --author=<name>`.
 - Gained practical experience with Kubernetes deployment lifecycle and observability pipelines.
 - Reinforced discipline in verifying AI-generated recommendations through tests and code reviews.
 - The project demonstrates a real-world architecture for cloud-native LLM services and provides a robust foundation for future extensions (API keys rotation, RBAC,  usage quotas, multi-region failover).
+=======
+## 11. Lessons Learned and Concluding Remarks
+
+- Learned how to unify heterogeneous LLM providers under one API, increase fault tolerance, and apply semantics-based caching.
+- Gained practical experience with Kubernetes deployment lifecycle and observability pipelines.
+- Reinforced discipline in verifying AI-generated recommendations through tests and code reviews.
+- The project demonstrates a real-world architecture for cloud-native LLM services and provides a robust foundation for future extensions (API keys rotation, RBAC,  usage quotas, multi-region failover).
+
+>>>>>>> 13e5a95fb3259eadcaed3aa4046d050ad92e8c5b
 ---
