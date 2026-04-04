@@ -88,7 +88,7 @@ docker compose up -d
 
 | Service    | URL                   | Credentials(username/password)   |
 |------------|-----------------------|---------------|
-| Grafana    | http://localhost:3000 | admin/admin |
+| Grafana    | http://localhost:3000 | admin/password |
 | Prometheus | http://localhost:9090 | —             |
 
 The **Golden Gate Gateway - Metrics** dashboard is provisioned automatically — no manual import needed. Open Grafana and it will be available under **Dashboards**.
@@ -251,7 +251,7 @@ Monitor:
 
 ## 9. Video Demo
 
-- Video URL: `https://youtu.be/wSiC2EXkwCo`
+- Video URL: `https://drive.google.com/file/d/1h491pllbcls26wxBYMARrWXvBXNOgumU/view?usp=drive_link`
 
 ## 10. AI Assistance & Verification (Summary)
 
