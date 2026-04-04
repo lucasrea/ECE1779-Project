@@ -36,7 +36,9 @@ scripts/deploy_doks.sh <grafana_admin_password> [postgres_password]
 Example:
 
 ```bash
-scripts/deploy_doks.sh password password
+GRAFANA_ADMIN_PASSWORD="$(openssl rand -base64 24)"
+POSTGRES_PASSWORD="$(openssl rand -base64 24)"
+scripts/deploy_doks.sh "$GRAFANA_ADMIN_PASSWORD" "$POSTGRES_PASSWORD"
 ```
 
 ## 4. Verify the deployment
@@ -53,7 +55,20 @@ Expected checks:
 - the Postgres PVC is `Bound`
 - the `gateway` service gets an external IP
 
-## 5. Test the public gateway
+## 5. Create a gateway API key
+
+The deployed API expects a bearer token. Create one against the deployed Postgres instance:
+
+```bash
+kubectl port-forward -n golden-gate svc/postgres 5433:5432
+python scripts/manage_api_keys.py \
+  --database-url "postgresql://postgres:${POSTGRES_PASSWORD}@localhost:5433/gateway" \
+  create --owner "doks-test"
+```
+
+Copy the plaintext key that the script prints. It is shown only once.
+
+## 6. Test the public gateway
 
 ```bash
 curl http://<EXTERNAL-IP>/health
@@ -62,12 +77,13 @@ curl http://<EXTERNAL-IP>/health
 ```bash
 curl -X POST http://<EXTERNAL-IP>/v1/chat/completions \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <your-api-key>" \
   -H "X-Provider: openai" \
   -H "X-Model: gpt-4.1" \
   -d '{"messages":[{"role":"user","content":"Say hello in one sentence."}]}'
 ```
 
-## 6. Access monitoring
+## 7. Access monitoring
 
 ```bash
 kubectl port-forward -n golden-gate svc/prometheus 9090:9090
