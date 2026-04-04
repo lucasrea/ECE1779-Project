@@ -3,7 +3,7 @@
 ## 1. Team Information
 
 - Member 1: Yingxuan Hu, 1006881377
-- Member 2: Jignwen Xu, 1011282675
+- Member 2: Jingwen Xu, 1011282675
 - Member 3: King Wang, 1008235081
 - Member 4: Lucas Rea, 1003099531
 
