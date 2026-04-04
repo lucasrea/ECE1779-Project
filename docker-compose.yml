@@ -39,8 +39,6 @@ services:
       - ./prometheus_data/prometheus.yml:/etc/prometheus/prometheus.yml
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    depends_on:
-      - gateway
     restart: unless-stopped
 
   grafana:
