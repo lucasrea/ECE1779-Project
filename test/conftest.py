@@ -26,8 +26,24 @@ def mock_cache():
         yield mock
 
 
+@pytest.fixture(autouse=True)
+def mock_api_key_store():
+    """Provide a mock ApiKeyStore so tests can control auth outcomes."""
+    mock = AsyncMock()
+    mock.authenticate = AsyncMock(
+        return_value={"owner_name": "test-user", "scopes": ["chat:completions"], "key_prefix": "testprefix"}
+    )
+    mock.close = AsyncMock(return_value=None)
+    with patch(
+        "src.auth.ApiKeyStore.create",
+        new_callable=AsyncMock,
+        return_value=mock,
+    ):
+        yield mock
+
+
 @pytest.fixture
-def client(mock_cache):
+def client(mock_cache, mock_api_key_store):
     with TestClient(app) as c:
         yield c
 

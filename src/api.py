@@ -5,9 +5,10 @@ from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 load_dotenv()
 
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 from prometheus_fastapi_instrumentator import Instrumentator
 
+from src.auth import ApiKeyPrincipal, ApiKeyStore, extract_bearer_token
 from src.models import ChatRequest, FallbackResponse
 from src.semantic_cache import SemanticCache
 from src.registry import PROVIDER_REGISTRY
@@ -31,6 +32,22 @@ DEFAULT_MODELS = {
 }
 
 
+async def require_api_key(authorization: str | None = Header(default=None)) -> ApiKeyPrincipal:
+    token = extract_bearer_token(authorization)
+    if not token:
+        raise HTTPException(status_code=401, detail="Missing or invalid bearer token")
+
+    store = getattr(app.state, "api_key_store", None)
+    if not store:
+        raise HTTPException(status_code=503, detail="Auth service unavailable")
+
+    principal = await store.authenticate(token)
+    if not principal:
+        raise HTTPException(status_code=401, detail="Invalid API key")
+
+    return principal
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     try:
@@ -43,12 +60,24 @@ async def lifespan(app: FastAPI):
             exc_info=True,
         )
         app.state.cache = None
+
+    try:
+        app.state.api_key_store = await ApiKeyStore.create()
+        logger.info("API key store initialized")
+    except Exception:
+        logger.exception("Could not initialize API key store")
+        app.state.api_key_store = None
+
     await start_price_refresh_loop()
     yield
     await stop_price_refresh_loop()
+
     cache = getattr(app.state, "cache", None)
     if cache:
         await cache.close()
+    store = getattr(app.state, "api_key_store", None)
+    if store:
+        await store.close()
 
 
 app = FastAPI(title="Golden Gate Gateway", lifespan=lifespan)
@@ -66,6 +95,7 @@ async def chat_completions(
     request: ChatRequest,
     x_provider: str = Header(...),
     x_model: str = Header(...),
+    _principal: ApiKeyPrincipal = Depends(require_api_key),
 ):
     provider_name = x_provider.lower()
     provider_cls = PROVIDER_REGISTRY.get(provider_name)

@@ -35,9 +35,10 @@ def _gemini_response(content="hello"):
 
 
 BODY = {"messages": [{"role": "user", "content": "hi"}]}
-OPENAI_HEADERS = {"X-Provider": "openai", "X-Model": "gpt-4.1"}
-ANTHROPIC_HEADERS = {"X-Provider": "anthropic", "X-Model": "claude-haiku-4-5"}
-GEMINI_HEADERS = {"X-Provider": "gemini", "X-Model": "gemini-2.5-flash"}
+AUTH_HEADER = {"Authorization": "Bearer gg_live_testprefix_testsecret"}
+OPENAI_HEADERS = {"X-Provider": "openai", "X-Model": "gpt-4.1", **AUTH_HEADER}
+ANTHROPIC_HEADERS = {"X-Provider": "anthropic", "X-Model": "claude-haiku-4-5", **AUTH_HEADER}
+GEMINI_HEADERS = {"X-Provider": "gemini", "X-Model": "gemini-2.5-flash", **AUTH_HEADER}
 
 
 # ---------------------------------------------------------------------------
@@ -51,6 +52,31 @@ async def test_openai_call(client, mock_openai_call):
     assert resp.status_code == 200
     assert resp.json()["choices"][0]["message"]["content"] == "hello"
     mock_openai_call.assert_awaited_once()
+
+
+def test_missing_authorization_header(client):
+    resp = client.post(
+        "/v1/chat/completions",
+        json=BODY,
+        headers={"X-Provider": "openai", "X-Model": "gpt-4.1"},
+    )
+    assert resp.status_code == 401
+    assert "bearer token" in resp.text
+
+
+def test_invalid_authorization_token(client, mock_api_key_store):
+    mock_api_key_store.authenticate.return_value = None
+    resp = client.post(
+        "/v1/chat/completions",
+        json=BODY,
+        headers={
+            "X-Provider": "openai",
+            "X-Model": "gpt-4.1",
+            "Authorization": "Bearer gg_live_badprefix_badsecret",
+        },
+    )
+    assert resp.status_code == 401
+    assert "Invalid API key" in resp.text
 
 
 @pytest.mark.asyncio
@@ -118,14 +144,18 @@ def test_unknown_provider(client):
     resp = client.post(
         "/v1/chat/completions",
         json=BODY,
-        headers={"X-Provider": "nope", "X-Model": "x"},
+        headers={"X-Provider": "nope", "X-Model": "x", **AUTH_HEADER},
     )
     assert resp.status_code == 400
     assert "Unknown provider" in resp.text
 
 
 def test_missing_provider_header(client):
-    resp = client.post("/v1/chat/completions", json=BODY, headers={"X-Model": "gpt-4.1"})
+    resp = client.post(
+        "/v1/chat/completions",
+        json=BODY,
+        headers={"X-Model": "gpt-4.1", **AUTH_HEADER},
+    )
     assert resp.status_code == 422
 
 

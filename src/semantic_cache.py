@@ -2,6 +2,7 @@ import hashlib
 import json
 import logging
 import os
+from src.db import build_database_url
 
 logger = logging.getLogger(__name__)
 
@@ -11,15 +12,8 @@ EMBEDDING_DIM = 384
 
 
 def _build_database_url() -> str:
-    url = os.getenv("DATABASE_URL")
-    if url:
-        return url
-    host = os.getenv("POSTGRES_HOST", "localhost")
-    port = os.getenv("POSTGRES_PORT", "5432")
-    user = os.getenv("POSTGRES_USER", "postgres")
-    password = os.getenv("POSTGRES_PASSWORD", "password")
-    db = os.getenv("POSTGRES_DB", "gateway")
-    return f"postgresql://{user}:{password}@{host}:{port}/{db}"
+    # Backward-compatible wrapper so existing imports keep working.
+    return build_database_url()
 
 
 class SemanticCache:
