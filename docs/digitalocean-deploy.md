@@ -7,7 +7,8 @@ These steps deploy the project to a DigitalOcean Kubernetes (DOKS) cluster using
 - A running DOKS cluster
 - `kubectl` configured for that cluster
 - `doctl` authenticated with DigitalOcean
-- A `.env` file in the repo root containing `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, and `GEMINI_API_KEY`
+- A `.env` file in the repo root containing `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, and `API_KEY_PEPPER`
+- A `POSTGRES_PASSWORD` provided either as the optional second argument to `scripts/deploy_doks.sh` or via the `POSTGRES_PASSWORD` environment variable
 - A gateway image pushed to DigitalOcean Container Registry that matches `k8s/gateway.yaml`
 
 ## 1. Connect to the cluster
