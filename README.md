@@ -5,7 +5,7 @@
 - Member 1: Yingxuan Hu, 1006881377, alvin.hu@mail.utoronto.ca
 - Member 2: Jingwen Xu, 1011282675,
 - Member 3: King Wang, 1008235081, jyang.wang@mail.utoronto.ca
-- Member 4: Lucas Rea, 1003099531,
+- Member 4: Lucas Rea, 1003099531, lucas.rea@mail.utoronto.ca
 
 ## 2. Motivation
 
