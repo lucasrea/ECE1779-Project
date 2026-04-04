@@ -129,6 +129,7 @@ Headers:
 - `X-Model: model-name`
 
 Body (OpenAI format):
+
 ```json
 {
   "messages": [
@@ -191,6 +192,8 @@ cd ECE1779-Project
 
 ### 7.4 Observability tests
 
+#### With actual gateway (less traffic so less visible impact)
+
 1. Start services:
 
 ```bash
@@ -214,6 +217,59 @@ done
 3. Validate in Prometheus and Grafana.
 
 Credentials sent to TA.
+
+#### With simulated load (more visible)
+
+##### 1. Update `prometheus_data/prometheus.yml` to scrape the host.  
+
+Change the `golden-gate-gateway` scrape target to point to your host machine (Prometheus already has `host.docker.internal` mapped via `extra_hosts`):
+
+In [prometheus_data/prometheus.yml](prometheus_data/prometheus.yml), line 13, change:
+
+```yaml
+targets: ["gateway:8000"]
+```
+to:
+```yaml
+targets: ["host.docker.internal:8000"]
+```
+
+##### 2. Start only Prometheus + Grafana (skip the gateway container)
+
+```bash
+docker-compose up prometheus grafana
+```
+
+This avoids a port conflict with `simulate_traffic.py`, which also binds port 8000.
+
+##### 3. Install dependencies (if not already)
+
+```bash
+pip install fastapi uvicorn prometheus-fastapi-instrumentator
+```
+
+##### 4. Run the simulator
+From the project root:
+
+```py
+# Default: 2 req/s, 30% cache hits, 10% failures
+python simulate_traffic.py
+
+# OR, Heavier load with more variation
+python simulate_traffic.py --rate 10 --hit-rate 0.4 --fail-rate 0.15
+```
+
+You should see log output like:
+
+```bash
+INFO: Traffic loop started  rate=2.0/s  miss=60%  hit=30%  fail=10%
+INFO: Metrics emitted: 20 events so far
+```
+
+##### 5. Verify Prometheus is scraping
+Open http://localhost:9090/targets — the `golden-gate-gateway` job should show UP.
+
+##### 6. Validate in Grafana dashboard and ensure causally visible metrics.
 
 ## 8. Deployment Information
 
@@ -291,12 +347,11 @@ Detailed deployment notes are in `docs/digitalocean-deploy.md`.
 - Member 3: Kubernetes manifests (`k8s/*`), orchestration, testing scripts.
 - Member 4: observability (`prometheus_data/*`, Grafana dashboard).
 
-Align contributions to commit history using `git log --author=<name>`.
-
 ## 12. Lessons Learned and Concluding Remarks
 
 - Learned how to unify heterogeneous LLM providers under one API, increase fault tolerance, and apply semantics-based caching.
 - Gained practical experience with Kubernetes deployment lifecycle and observability pipelines.
 - Reinforced discipline in verifying AI-generated recommendations through tests and code reviews.
 - The project demonstrates a real-world architecture for cloud-native LLM services and provides a robust foundation for future extensions (API keys rotation, RBAC,  usage quotas, multi-region failover).
+
 ---
