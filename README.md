@@ -3,7 +3,7 @@
 ## 1. Team Information
 
 - Member 1: Yingxuan Hu, 1006881377
-- Member 2: Jignwen Xu, 1011282675
+- Member 2: Jingwen Xu, 1011282675
 - Member 3: King Wang, 1008235081
 - Member 4: Lucas Rea, 1003099531
 
@@ -130,14 +130,9 @@ Headers:
 - `Authorization: Bearer gg_live_<prefix>_<secret>`
 - `X-Provider: openai|anthropic|gemini`
 - `X-Model: model-name`
-<<<<<<< HEAD
-Body (OpenAI format):
-
-=======
 
 Body (OpenAI format):
 
->>>>>>> 13e5a95fb3259eadcaed3aa4046d050ad92e8c5b
 ```json
 {
   "messages": [
@@ -216,14 +211,56 @@ CREATE EXTENSION IF NOT EXISTS vector;
 
 ### 7.4 Observability tests
 
-1. Start services (`docker compose up -d`)
-2. Run traffic simulator:
+#### 1. Update `prometheus_data/prometheus.yml` to scrape the host.  
 
-```bash
-python simulate_traffic.py --rate 5 --duration 120
+Change the `golden-gate-gateway` scrape target to point to your host machine (Prometheus already has `host.docker.internal` mapped via `extra_hosts`):
+
+In [prometheus_data/prometheus.yml](prometheus_data/prometheus.yml), line 13, change:
+
+```yaml
+targets: ["gateway:8000"]
+```
+to:
+```yaml
+targets: ["host.docker.internal:8000"]
 ```
 
-3. Validate in Grafana dashboard and ensure causally visible metrics.
+#### 2. Start only Prometheus + Grafana (skip the gateway container)
+
+```bash
+docker-compose up prometheus grafana
+```
+
+This avoids a port conflict with `simulate_traffic.py`, which also binds port 8000.
+
+#### 3. Install dependencies (if not already)
+
+```bash
+pip install fastapi uvicorn prometheus-fastapi-instrumentator
+```
+
+#### 4. Run the simulator
+From the project root:
+
+```py
+# Default: 2 req/s, 30% cache hits, 10% failures
+python simulate_traffic.py
+
+# OR, Heavier load with more variation
+python simulate_traffic.py --rate 10 --hit-rate 0.4 --fail-rate 0.15
+```
+
+You should see log output like:
+
+```bash
+INFO: Traffic loop started  rate=2.0/s  miss=60%  hit=30%  fail=10%
+INFO: Metrics emitted: 20 events so far
+```
+
+#### 5. Verify Prometheus is scraping
+Open http://localhost:9090/targets — the `golden-gate-gateway` job should show UP.
+
+#### 6. Validate in Grafana dashboard and ensure causally visible metrics.
 
 ## 8. Deployment Information
 
@@ -271,7 +308,7 @@ Monitor:
   - Prometheus metrics checks (`/targets`, query metrics) and Grafana dashboards confirm observability.
   - `simulate_traffic.py` load tests validate behaviors and error-handling.
 
-> See `ai_session.md` for detailed AI dialogue excerpts and explicit issue tracing.
+> See `ai-session.md` for detailed AI dialogue excerpts and explicit issue tracing.
 
 ## 10. Individual Contributions
 
@@ -280,16 +317,6 @@ Monitor:
 - Member 3: Kubernetes manifests (`k8s/*`), orchestration, testing scripts.
 - Member 4: observability (`prometheus_data/*`, Grafana dashboard).
 
-<<<<<<< HEAD
-Align contributions to commit history using `git log --author=<name>`.
-
-## 11. Lessons Learned and Concluding Remarks
-
-- Learned how to unify heterogeneous LLM providers under one API, increase fault tolerance, and apply semantics-based caching.
-- Gained practical experience with Kubernetes deployment lifecycle and observability pipelines.
-- Reinforced discipline in verifying AI-generated recommendations through tests and code reviews.
-- The project demonstrates a real-world architecture for cloud-native LLM services and provides a robust foundation for future extensions (API keys rotation, RBAC,  usage quotas, multi-region failover).
-=======
 ## 11. Lessons Learned and Concluding Remarks
 
 - Learned how to unify heterogeneous LLM providers under one API, increase fault tolerance, and apply semantics-based caching.
@@ -297,5 +324,4 @@ Align contributions to commit history using `git log --author=<name>`.
 - Reinforced discipline in verifying AI-generated recommendations through tests and code reviews.
 - The project demonstrates a real-world architecture for cloud-native LLM services and provides a robust foundation for future extensions (API keys rotation, RBAC,  usage quotas, multi-region failover).
 
->>>>>>> 13e5a95fb3259eadcaed3aa4046d050ad92e8c5b
 ---
